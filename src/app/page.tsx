@@ -10,20 +10,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { LOTTERY_RULES, LotteryType, DrawResult } from "@/types/lottery";
 import LotteryBall from "@/components/LotteryBall";
-
-function formatMoney(v: number): string {
-  if (v === 0) return "—";
-  return v.toLocaleString("vi-VN") + " đ";
-}
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Asia/Ho_Chi_Minh",
-  });
-}
+import { formatDate, formatVnd } from "@/lib/format";
 
 export default function HomePage() {
   const [selectedType, setSelectedType] = useState<LotteryType>("MEGA_645");
@@ -181,7 +168,7 @@ export default function HomePage() {
             </div>
             {data.jackpot > 0 && (
               <span className="badge badge-success" style={{ fontSize: "var(--text-sm)" }}>
-                🏆 Jackpot: {formatMoney(data.jackpot)}
+                🏆 Jackpot: {formatVnd(data.jackpot)}
               </span>
             )}
           </div>

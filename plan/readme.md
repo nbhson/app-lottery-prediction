@@ -81,13 +81,36 @@ lint      →  No ESLint warnings or errors
 
 **Kết quả: 27/27 tests pass (15 + 12) · tsc 0 errors · lint sạch · build OK**
 
+## Cập nhật 28/10 (vòng 4) — múi giờ draw_date + dedupe formatDate
+
+**Audit múi giờ `draw_date`** — kết quả: kiến trúc đã ĐÚNG, chỉ cần chốt invariant:
+- DB lưu `draw_date TEXT` dạng date-only `YYYY-MM-DD` (scraper parse từ
+  `DD/MM/YYYY` của vietlott.vn) — không mang giờ, không lệch timezone khi lưu
+- So sánh trong `sync.ts` dùng string compare `>=` — đúng với ISO date
+- `calculateGap` dùng `new Date(dateStr)` 2 đầu cùng UTC midnight — chênh lệch
+  ngày chính xác, không bị DST
+- Hiển thị: `formatDate` pin `timeZone: "Asia/Ho_Chi_Minh"` — `00:00 UTC` =
+  `07:00` cùng ngày ở VN, nên ngày render luôn trùng ngày trong DB
+
+**Fix thực hiện:**
+- `src/lib/format.ts` (mới): `formatDate` + `formatVnd` dùng chung, kèm doc
+  giải thích invariant UTC-midnight → +7
+- Bỏ 2 bản `formatDate`/`formatMoney` duplicate trong `page.tsx`,
+  `history/page.tsx` → import từ lib
+- `types/lottery.ts`: sửa comment sai "múi giờ VN (UTC+7)" → đúng bản chất
+  date-only
+- `tests/format.test.ts` (5 tests): ngày biên tháng, invariant không lệch ±1
+  ngày, formatVnd 0 → "—"
+
+**Kết quả: 32/32 tests pass · tsc 0 errors · lint sạch · build OK**
+
 ## Việc tiếp theo (backlog)
 
 - [x] Bổ sung ESLint + Prettier, bỏ `--no-lint` khỏi build
 - [x] CI workflow (GitHub Actions): test + typecheck + build + lint
 - [x] Rate limiting cho API routes
 - [ ] Integration test cho API routes (supertest hoặc node:test + fetch)
-- [ ] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
+- [x] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
 - [x] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
 
 ## Pháp lý

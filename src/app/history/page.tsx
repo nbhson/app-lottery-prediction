@@ -6,20 +6,7 @@
 import { useState, useEffect } from "react";
 import { LOTTERY_RULES, LotteryType, DrawResult } from "@/types/lottery";
 import LotteryBall from "@/components/LotteryBall";
-
-function formatDate(d: string): string {
-  return new Date(d).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "Asia/Ho_Chi_Minh",
-  });
-}
-
-function formatMoney(v: number): string {
-  if (v === 0) return "—";
-  return v.toLocaleString("vi-VN") + " đ";
-}
+import { formatDate, formatVnd } from "@/lib/format";
 
 const LIMIT = 10;
 
@@ -129,7 +116,7 @@ export default function HistoryPage() {
                       </td>
                       <td>
                         {draw.jackpot > 0 ? (
-                          <span className="badge badge-success">{formatMoney(draw.jackpot)}</span>
+                          <span className="badge badge-success">{formatVnd(draw.jackpot)}</span>
                         ) : (
                           <span className="text-muted">—</span>
                         )}

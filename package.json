@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts",
+    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts",
     "lint": "next lint"
   },
   "dependencies": {

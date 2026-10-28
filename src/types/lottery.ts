@@ -16,7 +16,7 @@ export interface DrawResult {
   id: number;
   drawNumber: string;
   lotteryType: LotteryType;
-  drawDate: string; // ISO date string, múi giờ Việt Nam (UTC+7)
+  drawDate: string; // ISO date-only string "YYYY-MM-DD" (ngày quay theo lịch VN — không mang giờ)
   numbers: number[]; // 6 số cho Mega 6/45
   bonusNumber?: number; // số đặc biệt cho Power 6/55
   jackpot: number; // giải jackpot (VNĐ)
