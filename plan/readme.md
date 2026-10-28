@@ -48,16 +48,27 @@ dự đoán thống kê + AI (OpenAI-compatible), dữ liệu thật từ vietlo
 npm test  →  15/15 pass
 tsc       →  0 errors
 build     →  12 routes compile sạch
+lint      →  No ESLint warnings or errors
 ```
+
+## Cập nhật 28/10 (vòng 2)
+
+- **ESLint setup**: `eslint@8.57` + `eslint-config-next@14.2.35`, `.eslintrc.json`
+  (extends `next/core-web-vitals`). Bỏ `--no-lint` khỏi build — giờ lint chạy
+  trong `next build`. Thêm script `lint`. Kết quả: 0 warnings/errors.
+- **CI workflow** `.github/workflows/ci.yml`: typecheck → lint → test → build
+  trên Node 20, cache npm, trigger push/PR vào main. Không cần secrets lúc build
+  (AI_API_KEY là optional — thiếu thì AI disabled).
+- README: thêm badge CI + License.
 
 ## Việc tiếp theo (backlog)
 
-- [ ] Bổ sung ESLint + Prettier, bỏ `--no-lint` khỏi build
+- [x] Bổ sung ESLint + Prettier, bỏ `--no-lint` khỏi build
+- [x] CI workflow (GitHub Actions): test + typecheck + build + lint
 - [ ] Rate limiting cho API routes
 - [ ] Integration test cho API routes (supertest hoặc node:test + fetch)
 - [ ] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
 - [ ] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
-- [ ] CI workflow (GitHub Actions): test + typecheck + build
 
 ## Pháp lý
 

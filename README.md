@@ -1,5 +1,8 @@
 # Vietlott Prediction — Enterprise Edition
 
+[![CI](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 > Ứng dụng web chuẩn enterprise: **tự động đồng bộ kết quả Vietlott THẬT** từ website chính thức, dự đoán kết hợp **thống kê + model AI** (cấu hình qua `.env`).
 
 ⚠️ **Cảnh báo:** Dự đoán KHÔNG đảm bảo trúng. Xổ số là ngẫu nhiên hoàn toàn. 18+, chơi có trách nhiệm.
