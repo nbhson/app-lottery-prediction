@@ -104,12 +104,37 @@ lint      →  No ESLint warnings or errors
 
 **Kết quả: 32/32 tests pass · tsc 0 errors · lint sạch · build OK**
 
+## Cập nhật 28/10 (vòng 5) — integration test API routes + fix bug 400/500
+
+**Bug thật tìm ra qua integration test:** 3 route (`draws/latest`,
+`draws/history`, `prediction`, `ai-prediction`) cast `type` thẳng
+`as LotteryType` rồi truy cập `LOTTERY_RULES[type].nameVi` → query
+`?type=INVALID` gây **TypeError → 500** thay vì 400.
+
+**Fix:**
+- `src/lib/validate.ts` (mới): `parseLotteryTypeParam()` — trả type hợp lệ
+  (default MEGA_645) hoặc null → route trả 400 rõ ràng
+- 4 routes validate trước khi đụng DB/AI
+
+**Integration tests** `tests/api-routes.test.ts` (10 tests) — gọi route
+handlers TRỰC TIẾP với `NextRequest` thật (không cần server):
+- `/api/status` → 200, không leak API key (regex scan toàn response)
+- `/api/draws/latest`: 200 + meta shape; type rỗng → default; INVALID → 400
+- `/api/draws/history`: 200 + phân trang hasMore; INVALID → 400
+- `/api/prediction`: INVALID → 400; method lạ → không 500
+- `/api/ai-prediction`: INVALID → 400
+- `POST /api/sync`: type INVALID → 400 (trước rate-limit check, không scrape)
+
+**Kết quả: 42/42 tests pass (15 + 12 + 5 + 10) · tsc 0 · lint sạch · build OK**
+
+## Trạng thái: ✅ BACKLOG ĐÃ XỬ LÝ HẾT — chuyển sang chế độ bảo trì
+
 ## Việc tiếp theo (backlog)
 
 - [x] Bổ sung ESLint + Prettier, bỏ `--no-lint` khỏi build
 - [x] CI workflow (GitHub Actions): test + typecheck + build + lint
 - [x] Rate limiting cho API routes
-- [ ] Integration test cho API routes (supertest hoặc node:test + fetch)
+- [x] Integration test cho API routes (supertest hoặc node:test + fetch)
 - [x] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
 - [x] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
 

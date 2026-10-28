@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { predictWithAI } from "@/lib/ai/prediction";
 import { LOTTERY_RULES } from "@/types/lottery";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { parseLotteryTypeParam } from "@/lib/validate";
 
 export const dynamic = "force-dynamic"; // AI prediction không cache
 
@@ -24,7 +25,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const type = (searchParams.get("type") ?? "MEGA_645") as "MEGA_645" | "POWER_655";
+    const type = parseLotteryTypeParam(searchParams.get("type"));
+    if (!type) {
+      return NextResponse.json(
+        { error: 'Loại hình không hợp lệ. Hợp lệ: "MEGA_645", "POWER_655"' },
+        { status: 400 }
+      );
+    }
     const historyLimit = Math.min(
       Math.max(parseInt(searchParams.get("historyLimit") ?? "30", 10) || 30, 5),
       100

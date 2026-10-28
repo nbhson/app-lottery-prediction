@@ -7,11 +7,18 @@ import {
 } from "@/lib/prediction";
 import { getDrawHistory } from "@/lib/db";
 import { Prediction, LOTTERY_RULES } from "@/types/lottery";
+import { parseLotteryTypeParam } from "@/lib/validate";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const type = (searchParams.get("type") ?? "MEGA_645") as "MEGA_645" | "POWER_655";
+    const type = parseLotteryTypeParam(searchParams.get("type"));
+    if (!type) {
+      return NextResponse.json(
+        { error: 'Loại hình không hợp lệ. Hợp lệ: "MEGA_645", "POWER_655"' },
+        { status: 400 }
+      );
+    }
     const method = searchParams.get("method") ?? "FREQUENCY_AND_GAP";
     const count = parseInt(searchParams.get("count") ?? "6");
 
