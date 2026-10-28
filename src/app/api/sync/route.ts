@@ -7,11 +7,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { syncLotteryType, syncAll, getLastSyncError } from "@/lib/sync";
 import { getSyncLogs, getSyncStatus } from "@/lib/db";
 import { LotteryType } from "@/types/lottery";
+import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic"; // luôn chạy realtime, không cache
 
+/** Giới hạn 5 lần sync/phút/IP — mỗi lần kích hoạt scrape nguồn Vietlott. */
+const SYNC_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+
 export async function POST(request: NextRequest) {
   try {
+    const rl = checkRateLimit("sync", request.headers, SYNC_RATE_LIMIT.limit, SYNC_RATE_LIMIT.windowMs);
+    if (rl) {
+      return NextResponse.json(
+        { error: "Quá nhiều yêu cầu đồng bộ. Vui lòng thử lại sau." },
+        { status: 429, headers: { "Retry-After": String(rl.retryAfter) } }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
 

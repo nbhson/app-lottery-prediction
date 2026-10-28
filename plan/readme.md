@@ -61,11 +61,31 @@ lint      →  No ESLint warnings or errors
   (AI_API_KEY là optional — thiếu thì AI disabled).
 - README: thêm badge CI + License.
 
+## Cập nhật 28/10 (vòng 3) — rate limiting
+
+- **`src/lib/rate-limit.ts`**: sliding-window in-memory limiter với:
+  - `rateLimit(key, limit, windowMs)` — trả `{ok, remaining, retryAfter}`
+  - `evictStale()` — dọn bucket cũ định kỳ tránh memory leak
+  - `getClientIp(headers)` — x-forwarded-for (entry đầu, trim) → x-real-ip → "unknown"
+  - `checkRateLimit(route, headers, limit, windowMs)` — helper cho API routes,
+    trả `null` khi được phép / result khi bị chặn
+  - Lưu ý TS: dùng `Map.forEach` thay `for...of` (target es5, tránh downlevelIteration)
+- **Áp dụng**:
+  - `POST /api/sync` — 5 req/phút/IP (mỗi lần kích hoạt scrape Vietlott) → 429 + Retry-After
+  - `GET /api/ai-prediction` — 10 req/phút/IP (mỗi lần tốn chi phí AI) → 429 + Retry-After
+- **`tests/rate-limit.test.ts`** (12 tests, node:test + `t.mock.timers`):
+  sliding không fixed-window, retryAfter từ hit cũ nhất, per-key isolation,
+  getClientIp contract, checkRateLimit null/object.
+- Fix test mới: dùng relative import `../src/lib/rate-limit` (tsx --test không
+  hiểu `@/` alias); `mock.timers` của node:test enable qua `t.mock.timers.enable({apis:["Date"]})`.
+
+**Kết quả: 27/27 tests pass (15 + 12) · tsc 0 errors · lint sạch · build OK**
+
 ## Việc tiếp theo (backlog)
 
 - [x] Bổ sung ESLint + Prettier, bỏ `--no-lint` khỏi build
 - [x] CI workflow (GitHub Actions): test + typecheck + build + lint
-- [ ] Rate limiting cho API routes
+- [x] Rate limiting cho API routes
 - [ ] Integration test cho API routes (supertest hoặc node:test + fetch)
 - [ ] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
 - [ ] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
