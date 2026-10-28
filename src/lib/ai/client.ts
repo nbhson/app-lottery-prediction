@@ -191,7 +191,7 @@ export async function chatCompletion(
  * Trạng thái cấu hình AI — dùng cho endpoint /api/ai/status.
  * KHÔNG bao giờ trả về API key.
  */
-export function getAIStatus(): AIStatus {
+export function getAIConfig(): AIStatus {
   const config = getConfig();
   return {
     enabled: config.ai.enabled,

@@ -15,7 +15,7 @@ import {
 } from "../src/lib/prediction";
 import { LOTTERY_RULES, DrawResult } from "../src/types/lottery";
 import { getConfig } from "../src/lib/config";
-import { getAIStatus } from "../src/lib/ai/client";
+import { getAIConfig } from "../src/lib/ai/client";
 import {
   parseAIPredictionShape,
   parseMega645ForTest,
@@ -87,9 +87,9 @@ describe("getConfig — đọc .env an toàn", () => {
   });
 });
 
-describe("getAIStatus — không bao giờ lộ API key", () => {
+describe("getAIConfig — không bao giờ lộ API key", () => {
   it("trả về object chỉ có 4 field, không chứa apiKey", () => {
-    const status = getAIStatus();
+    const status = getAIConfig();
     assert.ok("enabled" in status);
     assert.ok("provider" in status);
     assert.ok("model" in status);

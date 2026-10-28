@@ -88,7 +88,7 @@ lint      →  No ESLint warnings or errors
 - [x] Rate limiting cho API routes
 - [ ] Integration test cho API routes (supertest hoặc node:test + fetch)
 - [ ] Xử lý múi giờ draw_date đồng nhất (đang lưu ISO date, so sánh string)
-- [ ] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
+- [x] Đổi tên `getAIStatus()` → `getAIConfig()` (đặt tên đúng bản chất)
 
 ## Pháp lý
 

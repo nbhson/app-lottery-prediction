@@ -3,7 +3,7 @@
  */
 import { NextResponse } from "next/server";
 import { getDataSourceStatus, getSyncStatus } from "@/lib/db";
-import { getAIStatus } from "@/lib/ai/client";
+import { getAIConfig } from "@/lib/ai/client";
 import { getConfig } from "@/lib/config";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({
       data: {
         ...getSyncStatus(),
-        ai: getAIStatus(),
+        ai: getAIConfig(),
         dataSourceConfigured: getConfig().dataSource.source,
       },
     });
