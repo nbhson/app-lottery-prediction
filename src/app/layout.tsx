@@ -18,12 +18,21 @@ export const viewport: Viewport = {
   themeColor: "#c8102e",
 };
 
+/**
+ * Script chống flash (FOUC) khi load trang: set data-theme trên <html>
+ * TRƯỚC khi CSS/body render — ưu tiên localStorage, fallback
+ * prefers-color-scheme của hệ điều hành. Chạy inline, đồng bộ, không async.
+ */
+const themeInitScript = `(function(){try{var t=localStorage.getItem("theme");if(t!=="light"&&t!=="dark"){t=window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}document.documentElement.setAttribute("data-theme",t);}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="vi">
+    <html lang="vi" suppressHydrationWarning>
       <body>
+        {/* Chạy trước mọi nội dung để tránh flash light theme ở dark mode */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <NavBar />
         <main className="main">{children}</main>
         <footer className="footer">

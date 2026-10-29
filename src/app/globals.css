@@ -40,6 +40,21 @@
   --color-purple:         #7c3aed;
   --color-purple-light:   #ede9fe;
 
+  /* Banner/badge text on tinted backgrounds (token hóa để dark mode đọc đúng) */
+  --color-warning-text:   #92400e;
+  --color-info-text:      #1e3a8a;
+  --color-success-text:   #065f46;
+
+  /* Skeleton highlight (lớp shimmer) */
+  --skeleton-highlight:   rgba(255, 255, 255, 0.55);
+
+  /* Footer & toast (nền đậm cố định ở cả 2 theme) */
+  --color-footer-bg1:     #1e293b;
+  --color-footer-bg2:     #0f172a;
+  --color-toast-success:  #065f46;
+  --color-toast-error:    #991b1b;
+  --color-toast-info:     #1e3a8a;
+
   /* Spacing (8px grid) */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -92,6 +107,59 @@
   --warning: #f59e0b;
   --danger: var(--color-danger);
 }
+
+/* ── 1b. Dark Theme (data-theme="dark", set bởi script chống flash) ── */
+[data-theme="dark"] {
+  /* Brand giữ nguyên đỏ Vietlott */
+  --color-primary:        #c8102e;
+  --color-primary-dark:   #e01733;
+  --color-primary-light:  #3d0a14;
+
+  /* Neutrals */
+  --color-bg:             #0b1220;
+  --color-surface:        #111a2c;
+  --color-surface-alt:    #1a2436;
+  --color-border:         #2a3548;
+  --color-border-strong:  #3d4d68;
+
+  /* Text */
+  --color-text:           #e2e8f0;
+  --color-text-secondary: #b6c2d4;
+  --color-text-muted:     #8b98ab;
+  --color-text-faint:     #64748b;
+
+  /* Semantic — nền tối hơn, chữ sáng hơn */
+  --color-success:        #34d399;
+  --color-success-bg:     #06281e;
+  --color-success-border: #065f46;
+  --color-warning:        #fbbf24;
+  --color-warning-bg:     #2d2105;
+  --color-warning-border: #92610c;
+  --color-danger:         #f87171;
+  --color-danger-bg:      #2d0d0d;
+  --color-danger-border:  #7f1d1d;
+  --color-info:           #60a5fa;
+  --color-info-bg:        #0c1f3d;
+  --color-info-border:    #1e40af;
+  --color-purple:         #a78bfa;
+  --color-purple-light:   #2a2150;
+
+  --color-warning-text:   #fcd34d;
+  --color-info-text:      #93c5fd;
+  --color-success-text:   #6ee7b7;
+
+  /* Elevation — shadow đậm hơn trên nền tối */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 2px 6px rgba(0, 0, 0, 0.35);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+  /* Skeleton highlight dịu trên nền tối */
+  --skeleton-highlight: rgba(255, 255, 255, 0.08);
+}
+
+/* color-scheme cho scrollbars + form controls của trình duyệt */
+:root { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
 
 /* ── 2. Base ──────────────────────────────────────────────── */
 * {
@@ -297,13 +365,13 @@ a { color: var(--color-primary); }
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
-  color: #92400e;
+  color: var(--color-warning-text);
   font-size: var(--text-sm);
   animation: fadeInUp 300ms ease-out;
 }
 
 .warning-banner strong {
-  color: #92400e;
+  color: var(--color-warning-text);
 }
 
 .info-banner {
@@ -313,7 +381,7 @@ a { color: var(--color-primary); }
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
-  color: #1e3a8a;
+  color: var(--color-info-text);
   font-size: var(--text-sm);
   animation: fadeInUp 300ms ease-out;
 }
@@ -325,7 +393,7 @@ a { color: var(--color-primary); }
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
   margin-bottom: var(--space-5);
-  color: #065f46;
+  color: var(--color-success-text);
   font-size: var(--text-sm);
 }
 
@@ -596,7 +664,7 @@ a { color: var(--color-primary); }
 }
 
 .stat-bar.cold {
-  background: #3b82f6;
+  background: var(--color-info);
 }
 
 /* ── 13. Badges / Chips ───────────────────────────────────── */
@@ -688,7 +756,7 @@ a { color: var(--color-primary); }
   background: linear-gradient(
     90deg,
     transparent,
-    rgba(255, 255, 255, 0.55),
+    var(--skeleton-highlight),
     transparent
   );
   animation: shimmer 1.4s infinite;
@@ -731,23 +799,23 @@ a { color: var(--color-primary); }
 }
 
 .toast-success {
-  background: #065f46;
+  background: var(--color-toast-success);
   color: #fff;
 }
 
 .toast-error {
-  background: #991b1b;
+  background: var(--color-toast-error);
   color: #fff;
 }
 
 .toast-info {
-  background: #1e3a8a;
+  background: var(--color-toast-info);
   color: #fff;
 }
 
 /* ── 16. Footer ───────────────────────────────────────────── */
 .footer {
-  background: linear-gradient(180deg, #1e293b, #0f172a);
+  background: linear-gradient(180deg, var(--color-footer-bg1), var(--color-footer-bg2));
   color: rgba(255, 255, 255, 0.75);
   padding: var(--space-6) var(--space-4);
   text-align: center;
@@ -868,4 +936,261 @@ a { color: var(--color-primary); }
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+/* ── 23. Shared page helpers (thay inline style trong pages) ── */
+.page-title {
+  margin-bottom: var(--space-6);
+}
+
+.section-title {
+  margin-bottom: var(--space-4);
+  font-size: var(--text-xl);
+  font-weight: 700;
+}
+
+.actions-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.actions-right {
+  margin-left: auto;
+}
+
+.ball-row-lg {
+  margin: var(--space-6) 0;
+}
+
+.ball-cell {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.text-xs-muted {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.ml-2 { margin-left: var(--space-2); }
+.ml-4 { margin-left: var(--space-4); }
+.mt-3 { margin-top: var(--space-3); }
+.mt-4 { margin-top: var(--space-4); }
+
+.banner-inline {
+  margin-top: var(--space-5);
+  margin-bottom: 0;
+}
+
+.skeleton-row {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.input-inline {
+  width: auto;
+  display: inline-block;
+  min-width: 190px;
+}
+
+.confidence-row {
+  margin-top: var(--space-4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+/* ── 24. Pagination ───────────────────────────────────────── */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.pagination-controls {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ── 25. Theme Toggle (trong nav đỏ) ──────────────────────── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  margin-left: var(--space-2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+
+.theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.24);
+  transform: translateY(-1px);
+}
+
+.theme-toggle:active {
+  transform: translateY(0);
+}
+
+/* ── 26. Charts (/stats) ──────────────────────────────────── */
+.chart-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.chart-toolbar .label {
+  margin-bottom: 0;
+}
+
+.chart-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.chart-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 720px;
+}
+
+.chart-grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  fill: var(--color-text-muted);
+  font-size: 11px;
+  font-family: var(--font-sans);
+}
+
+.chart-axis-line {
+  stroke: var(--color-border-strong);
+  stroke-width: 1.5;
+}
+
+.chart-axis-num {
+  font-size: 10px;
+}
+
+.chart-bar rect {
+  fill: var(--color-primary);
+  transition: opacity var(--transition-fast);
+}
+
+.chart-bar:hover rect {
+  fill: var(--color-primary-dark);
+  opacity: 0.85;
+}
+
+/* Tooltip hover của bar chart — ẩn mặc định, hiện khi hover nhóm bar */
+.chart-tooltip {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.chart-bar:hover .chart-tooltip {
+  opacity: 1;
+}
+
+.chart-tooltip rect {
+  fill: var(--color-text);
+  stroke: var(--color-border-strong);
+}
+
+.chart-tooltip text {
+  fill: var(--color-surface);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── 27. Heatmap cặp số (/stats) ──────────────────────────── */
+.heatmap-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2);
+  background: var(--color-surface-alt);
+}
+
+.heatmap-grid {
+  display: grid;
+  gap: 2px;
+  min-width: 560px;
+}
+
+.heatmap-head {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-family: var(--font-mono);
+  user-select: none;
+}
+
+.heatmap-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  min-width: 0;
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.heatmap-cell:hover {
+  box-shadow: 0 0 0 2px var(--color-text);
+  z-index: 1;
+  position: relative;
+}
+
+.heatmap-diag {
+  box-shadow: inset 0 0 0 1.5px var(--color-border-strong);
+}
+
+.heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.heatmap-legend-cell {
+  width: 22px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--color-border);
+}
+
+/* ── 28. Trend window select (/stats) ─────────────────────── */
+.stat-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+
+.stat-controls .label {
+  margin-bottom: 0;
 }

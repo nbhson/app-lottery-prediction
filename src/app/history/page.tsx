@@ -4,9 +4,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { LOTTERY_RULES, LotteryType, DrawResult } from "@/types/lottery";
-import LotteryBall from "@/components/LotteryBall";
-import { formatDate, formatVnd } from "@/lib/format";
+import { LotteryType, DrawResult } from "@/types/lottery";
+import DrawTable from "@/components/DrawTable";
+import Pagination from "@/components/Pagination";
+import TypeSelector from "@/components/TypeSelector";
 
 const LIMIT = 10;
 
@@ -47,25 +48,14 @@ export default function HistoryPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totalPages = Math.ceil(total / LIMIT);
-
   return (
     <>
       <h1 style={{ marginBottom: "var(--space-6)" }}>Lịch sử kết quả xổ số</h1>
 
-      <div className="type-selector" role="tablist" aria-label="Loại hình xổ số">
-        {Object.entries(LOTTERY_RULES).map(([key, rule]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={selectedType === key}
-            className={`type-btn${selectedType === key ? " active" : ""}`}
-            onClick={() => fetchHistory(key as LotteryType, 0)}
-          >
-            {rule.nameVi}
-          </button>
-        ))}
-      </div>
+      <TypeSelector
+        selected={selectedType}
+        onSelect={(type) => fetchHistory(type, 0)}
+      />
 
       {loading ? (
         <div className="card" aria-busy="true" aria-label="Đang tải lịch sử">
@@ -89,79 +79,16 @@ export default function HistoryPage() {
       ) : draws.length > 0 ? (
         <>
           <div className="card">
-            <div className="table-wrapper">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th scope="col">Kỳ</th>
-                    <th scope="col">Ngày</th>
-                    <th scope="col">Kết quả</th>
-                    <th scope="col">Jackpot</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {draws.map((draw) => (
-                    <tr key={draw.id}>
-                      <td className="mono">{draw.drawNumber}</td>
-                      <td>{formatDate(draw.drawDate)}</td>
-                      <td>
-                        <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
-                          {draw.numbers.map((n, i) => (
-                            <LotteryBall key={`${draw.id}-${n}-${i}`} n={n} size="sm" />
-                          ))}
-                          {draw.bonusNumber !== undefined && (
-                            <LotteryBall n={draw.bonusNumber} bonus size="sm" />
-                          )}
-                        </div>
-                      </td>
-                      <td>
-                        {draw.jackpot > 0 ? (
-                          <span className="badge badge-success">{formatVnd(draw.jackpot)}</span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DrawTable draws={draws} />
           </div>
 
           {/* Phân trang */}
-          <nav
-            aria-label="Phân trang"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              flexWrap: "wrap",
-              gap: "var(--space-2)",
-            }}
-          >
-            <span className="text-muted">
-              Hiển thị {page * LIMIT + 1}–{Math.min((page + 1) * LIMIT, total)} của {total} kỳ
-            </span>
-            <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => fetchHistory(selectedType, page - 1)}
-                disabled={page === 0}
-              >
-                ← Trước
-              </button>
-              <span className="badge badge-neutral">
-                Trang {page + 1}/{totalPages || 1}
-              </span>
-              <button
-                className="btn btn-secondary btn-sm"
-                onClick={() => fetchHistory(selectedType, page + 1)}
-                disabled={page >= totalPages - 1}
-              >
-                Sau →
-              </button>
-            </div>
-          </nav>
+          <Pagination
+            page={page}
+            limit={LIMIT}
+            total={total}
+            onPageChange={(p) => fetchHistory(selectedType, p)}
+          />
         </>
       ) : (
         <div className="card text-center">

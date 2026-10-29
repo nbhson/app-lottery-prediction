@@ -86,3 +86,20 @@ export interface DataSourceStatus {
   recordCount: number;
   note?: string;
 }
+
+// ============================================================
+// Thống kê nâng cao (client-safe types — KHÔNG import lib/db vào đây)
+// ============================================================
+
+/** Cặp số cùng xuất hiện trong 1 kỳ + số lần đồng xuất hiện */
+export interface PairStat {
+  a: number; // luôn < b
+  b: number;
+  count: number;
+}
+
+export interface PairMatrixResult {
+  pairs: PairStat[]; // chỉ chứa cặp có count > 0 (danh sách thưa)
+  maxCount: number;
+  drawsAnalyzed: number;
+}

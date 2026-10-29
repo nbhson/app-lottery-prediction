@@ -8,7 +8,15 @@
  * CẢNH BÁO: Đây chỉ là THỐNG KÊ, KHÔNG đảm bảo trúng.
  * Mỗi kỳ quay là sự kiện ngẫu nhiên độc lập.
  */
-import { DrawResult, FrequencyStats, LotteryType, Prediction, LOTTERY_RULES } from "@/types/lottery";
+import {
+  DrawResult,
+  FrequencyStats,
+  LotteryType,
+  Prediction,
+  LOTTERY_RULES,
+  PairStat,
+  PairMatrixResult,
+} from "@/types/lottery";
 import { getDrawHistory } from "./db";
 
 /**
@@ -186,4 +194,83 @@ export function getHotAndColdNumbers(
     hot: sorted.slice(0, top),
     cold: sorted.slice(-top).reverse(),
   };
+}
+
+// ============================================================
+// Thống kê nâng cao cho trang /stats
+// ============================================================
+
+export type { PairStat, PairMatrixResult } from "@/types/lottery";
+
+/**
+ * Ma trận đồng xuất hiện của cặp số: với mỗi kỳ, mọi cặp 2 số trong bộ kết quả
+ * được đếm 1 lần. Trả về danh sách thưa (a < b) để dựng heatmap ma trận cặp.
+ */
+export function calculatePairMatrix(
+  draws: DrawResult[],
+  lotteryType: LotteryType
+): PairMatrixResult {
+  const rule = LOTTERY_RULES[lotteryType];
+  const counts = new Map<string, number>();
+
+  for (const draw of draws) {
+    const nums = draw.numbers.filter(
+      (n) => n >= rule.minNumber && n <= rule.maxNumber
+    );
+    for (let i = 0; i < nums.length; i++) {
+      for (let j = i + 1; j < nums.length; j++) {
+        const a = Math.min(nums[i], nums[j]);
+        const b = Math.max(nums[i], nums[j]);
+        const key = `${a}-${b}`;
+        counts.set(key, (counts.get(key) ?? 0) + 1);
+      }
+    }
+  }
+
+  const pairs: PairStat[] = Array.from(counts.entries()).map(([key, count]) => {
+    const [a, b] = key.split("-").map(Number);
+    return { a, b, count };
+  });
+
+  return {
+    pairs,
+    maxCount: pairs.reduce((m, p) => Math.max(m, p.count), 0),
+    drawsAnalyzed: draws.length,
+  };
+}
+
+/** Các cửa sổ kỳ cho xu hướng nóng/lạnh */
+export const TREND_WINDOWS = [10, 20, 50] as const;
+
+export interface TrendResult {
+  window: number; // số kỳ thực tế đã phân tích
+  hot: FrequencyStats[];
+  cold: FrequencyStats[];
+  drawsAnalyzed: number;
+}
+
+/**
+ * Xu hướng số nóng/lạnh trong N kỳ gần nhất (N ∈ 10/20/50).
+ * `draws` phải sắp xếp mới nhất trước (đúng thứ tự getDrawHistory trả về).
+ *
+ * - hot: count giảm dần (ra nhiều nhất trong cửa sổ)
+ * - cold: count tăng dần rồi gap giảm dần (ít ra nhất, lâu nhất mới ra)
+ */
+export function calculateTrend(
+  draws: DrawResult[],
+  lotteryType: LotteryType,
+  windowSize: number,
+  top: number = 5
+): TrendResult {
+  const recent = draws.slice(0, Math.max(1, Math.min(windowSize, draws.length)));
+  const stats = calculateFrequencyStats(recent, lotteryType);
+
+  const hot = [...stats]
+    .sort((a, b) => b.count - a.count || a.number - b.number)
+    .slice(0, top);
+  const cold = [...stats]
+    .sort((a, b) => a.count - b.count || b.gap - a.gap || a.number - b.number)
+    .slice(0, top);
+
+  return { window: recent.length, hot, cold, drawsAnalyzed: recent.length };
 }
