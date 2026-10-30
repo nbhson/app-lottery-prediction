@@ -13,7 +13,12 @@ import fs from "fs";
 import path from "path";
 import { DrawResult, LotteryType, DataSourceStatus } from "@/types/lottery";
 
-const DB_PATH = path.join(process.cwd(), "data", "vietlott.db");
+/**
+ * Thư mục chứa DB — override qua DATA_DIR (hữu ích khi chạy standalone/ Docker,
+ * không phụ thuộc process.cwd()).
+ */
+const DATA_DIR = process.env.DATA_DIR?.trim() || path.join(process.cwd(), "data");
+const DB_PATH = path.join(DATA_DIR, "vietlott.db");
 
 // Singleton cho database
 let db: Database.Database | null = null;
@@ -210,6 +215,46 @@ export function upsertDraw(draw: Omit<DrawResult, "id">): { inserted: boolean } 
   return { inserted: result.changes > 0 };
 }
 
+/**
+ * Upsert N kỳ trong MỘT transaction — dùng cho backfill lịch sử
+ * (hàng nghìn row, 1 prepared statement + 1 transaction = nhanh).
+ * Dùng INSERT OR IGNORE với UNIQUE(draw_number, lottery_type) → chống trùng.
+ *
+ * @returns số bản ghi thực sự chèn mới
+ */
+export function insertDrawsMany(
+  draws: Array<Omit<DrawResult, "id">>
+): number {
+  const db = getDb();
+  const stmt = db.prepare(`
+    INSERT OR IGNORE INTO draws
+      (draw_number, lottery_type, draw_date, numbers, bonus_number, jackpot, published)
+    VALUES
+      (@drawNumber, @lotteryType, @drawDate, @numbers, @bonusNumber, @jackpot, @published)
+  `);
+
+  let inserted = 0;
+  const insertAll = db.transaction(
+    (rows: Array<Omit<DrawResult, "id">>) => {
+      for (const draw of rows) {
+        const result = stmt.run({
+          drawNumber: draw.drawNumber,
+          lotteryType: draw.lotteryType,
+          drawDate: draw.drawDate,
+          numbers: JSON.stringify(draw.numbers),
+          bonusNumber: draw.bonusNumber ?? null,
+          jackpot: draw.jackpot,
+          published: draw.published ? 1 : 0,
+        });
+        inserted += result.changes;
+      }
+    }
+  );
+
+  insertAll(draws);
+  return inserted;
+}
+
 // ============================================================
 // Truy vấn
 // ============================================================
@@ -276,6 +321,24 @@ export function getDrawsForAI(type: LotteryType, limit: number = 20): DrawResult
     .all(type, limit) as DrawRow[];
 
   return rows.map(mapRowToDrawResult);
+}
+
+/** Lấy kết quả cũ nhất theo loại hình (dùng cho backfill chain) */
+export function getOldestDraw(type: LotteryType): DrawResult | null {
+  const row = getDb()
+    .prepare(
+      `
+      SELECT id, draw_number, lottery_type, draw_date, numbers,
+             bonus_number, jackpot, published
+      FROM draws
+      WHERE lottery_type = ?
+      ORDER BY draw_date ASC
+      LIMIT 1
+    `
+    )
+    .get(type) as DrawRow | undefined;
+
+  return row ? mapRowToDrawResult(row) : null;
 }
 
 /** Đếm tổng số kỳ của 1 loại hình */
@@ -370,6 +433,24 @@ export function startSyncLog(source: string): SyncLogHandle {
     .prepare("INSERT INTO sync_log (source) VALUES (?)")
     .run(source);
   return { id: Number(result.lastInsertRowid) };
+}
+
+/**
+ * Kiểm tra có lần sync RUNNING gần đây (trong `staleMinutes` phút) hay không.
+ * Dùng làm khóa liên tiến trình: nhiều instance Next.js cùng chạy thì
+ * process nào thấy RUNNING còn tươi sẽ nhường, tránh scrape trùng nhau.
+ */
+export function hasRecentRunningSync(staleMinutes: number): boolean {
+  const row = getDb()
+    .prepare(
+      `
+      SELECT COUNT(*) as c FROM sync_log
+      WHERE status = 'RUNNING'
+        AND started_at >= datetime('now', '+7 hours', ?)
+    `
+    )
+    .get(`-${staleMinutes} minutes`) as { c: number };
+  return row.c > 0;
 }
 
 /**

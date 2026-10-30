@@ -25,7 +25,10 @@ import {
   SCRAPE_FIXTURE_MEGA,
   SCRAPE_FIXTURE_POWER,
   SCRAPE_FIXTURE_NO_DATA,
+  SCRAPE_FIXTURE_HISTORY_MEGA,
+  SCRAPE_FIXTURE_HISTORY_POWER,
 } from "./fixtures/scrapeFixtures";
+import { parseHistoryPage } from "../src/lib/sources/vietlott-en-scraper";
 import { LotteryType } from "../src/types/lottery";
 
 // ============================================================
@@ -148,6 +151,86 @@ describe("Scraper parse (dữ liệu thật từ vietlott.vn EN)", () => {
     const result = parseMega645ForTest(SCRAPE_FIXTURE_NO_DATA);
     assert.strictEqual(result.success, false);
     assert.ok(result.error);
+  });
+
+  it("bonus ngoài phạm vi 1-55 → undefined (không fail cả kỳ)", () => {
+    const badBonus = SCRAPE_FIXTURE_POWER.replace(">49<", ">99<");
+    const result = parsePower655ForTest(badBonus);
+    assert.strictEqual(result.success, true);
+    if (result.success && result.data) {
+      assert.strictEqual(result.data.bonusNumber, undefined);
+    }
+  });
+});
+
+describe("parseHistoryPage — backfill từ trang winning-number", () => {
+  it("Mega: parse đủ kỳ, thứ tự mới nhất trước, đúng drawNumber", () => {
+    const result = parseHistoryPage(SCRAPE_FIXTURE_HISTORY_MEGA, "MEGA_645");
+    assert.strictEqual(result.success, true);
+    const draws = result.draws!;
+    assert.strictEqual(draws.length, 3);
+    // Mới nhất trước
+    assert.strictEqual(draws[0].drawNumber, "MXSH-01581");
+    assert.strictEqual(draws[1].drawNumber, "MXSH-01580");
+    assert.strictEqual(draws[2].drawNumber, "MXSH-01579");
+    assert.strictEqual(draws[0].drawDate, "2026-10-28");
+    assert.deepStrictEqual(draws[0].numbers, [1, 9, 11, 28, 33, 42]);
+    assert.strictEqual(draws[0].bonusNumber, undefined);
+    assert.ok(draws.every((d) => d.published));
+  });
+
+  it("Power: tách đúng bonus khỏi 6 số chính", () => {
+    const result = parseHistoryPage(SCRAPE_FIXTURE_HISTORY_POWER, "POWER_655");
+    assert.strictEqual(result.success, true);
+    const draws = result.draws!;
+    assert.strictEqual(draws.length, 2);
+    assert.deepStrictEqual(draws[0].numbers, [9, 29, 33, 38, 45, 46]);
+    assert.strictEqual(draws[0].bonusNumber, 53);
+    assert.deepStrictEqual(draws[1].numbers, [5, 11, 20, 27, 36, 50]);
+    assert.strictEqual(draws[1].bonusNumber, 7);
+  });
+
+  it("HTML rác → success=false, không ném exception", () => {
+    const result = parseHistoryPage(SCRAPE_FIXTURE_NO_DATA, "MEGA_645");
+    assert.strictEqual(result.success, false);
+    assert.ok(result.error);
+  });
+});
+
+describe("calculateFrequencyStats — gap đo bằng SỐ KỲ (không phải ngày)", () => {
+  it("số trong kỳ mới nhất → gap 0; cũ hơn → gap = số kỳ cách biệt", () => {
+    // Mới nhất trước: kỳ 1 (mới), kỳ 2, kỳ 3 (cũ)
+    const stats = calculateFrequencyStats(fixtureDraws, "MEGA_645");
+    const byNumber = new Map(stats.map((s) => [s.number, s]));
+    // Số 3, 12... ở kỳ 1 (index 0) → gap 0
+    assert.strictEqual(byNumber.get(3)!.gap, 0);
+    assert.strictEqual(byNumber.get(12)!.gap, 0);
+    // Số 7, 14... ở kỳ 2 (index 1) → gap 1
+    assert.strictEqual(byNumber.get(7)!.gap, 1);
+    // Số 1, 9... ở kỳ 3 (index 2) → gap 2
+    assert.strictEqual(byNumber.get(1)!.gap, 2);
+  });
+
+  it("số chưa từng xuất hiện → gap = tổng số kỳ", () => {
+    const stats = calculateFrequencyStats(fixtureDraws, "MEGA_645");
+    const never = stats.find((s) => s.number === 20)!;
+    assert.strictEqual(never.count, 0);
+    assert.strictEqual(never.gap, fixtureDraws.length);
+    assert.strictEqual(never.lastAppeared, "");
+  });
+});
+
+describe("confidence — trần trung thực, không bão hòa", () => {
+  it("mọi phương pháp trả confidence trong [10, 45]", () => {
+    const draws = buildFixtureDraws("MEGA_645", 100);
+    const methods = [
+      predictByFrequency("MEGA_645", draws),
+      predictByGap("MEGA_645", draws),
+      predictByFrequencyAndGap("MEGA_645", draws),
+    ];
+    for (const p of methods) {
+      assert.ok(p.confidence >= 10 && p.confidence <= 45, `confidence=${p.confidence}`);
+    }
   });
 });
 

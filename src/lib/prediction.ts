@@ -20,7 +20,11 @@ import {
 import { getDrawHistory } from "./db";
 
 /**
- * Tính thống kê tần suất cho 1 loại hình xổ số
+ * Tính thống kê tần suất cho 1 loại hình xổ số.
+ *
+ * BẤT BIẾN THỨ TỰ: `draws` phải sắp xếp MỚI NHẤT TRƯỚC (đúng thứ tự
+ * getDrawHistory/getDrawsForAI trả về). `gap` đo bằng SỐ KỲ: số kỳ gần nhất
+ * mà số đó chưa xuất hiện (số trong kỳ mới nhất → gap 0; chưa từng ra → gap = tổng số kỳ).
  */
 export function calculateFrequencyStats(
   draws: DrawResult[],
@@ -32,13 +36,16 @@ export function calculateFrequencyStats(
     (_, i) => i + rule.minNumber
   );
 
-  const latestDate = draws[0]?.drawDate ?? "";
   const lastAppearances = new Map<number, string>();
+  const gapOf = new Map<number, number>();
 
-  // Lần xuất hiện cuối của mỗi số
-  for (const draw of draws) {
-    for (const num of draw.numbers) {
-      lastAppearances.set(num, draw.drawDate);
+  // Duyệt mới nhất → cũ nhất: gap = index kỳ GẦN NHẤT chứa số (đơn vị: số kỳ)
+  for (let i = 0; i < draws.length; i++) {
+    for (const num of draws[i].numbers) {
+      if (!lastAppearances.has(num)) {
+        lastAppearances.set(num, draws[i].drawDate);
+        gapOf.set(num, i);
+      }
     }
   }
 
@@ -54,23 +61,11 @@ export function calculateFrequencyStats(
   return allNumbers.map((num) => {
     const count = counts.get(num) ?? 0;
     const lastAppeared = lastAppearances.get(num) ?? "";
-    const gap = lastAppeared
-      ? calculateGap(lastAppeared, latestDate)
-      : draws.length; // chưa bao giờ xuất hiện = gap = tổng số kỳ
+    // Chưa từng xuất hiện = gap bằng tổng số kỳ đã phân tích (cùng đơn vị "số kỳ")
+    const gap = gapOf.get(num) ?? draws.length;
 
     return { number: num, count, lastAppeared, gap };
   });
-}
-
-/**
- * Tính số ngày/kỳ giữa 2 ngày (đơn giản hóa — mỗi kỳ ~3-4 ngày)
- */
-function calculateGap(fromDate: string, toDate: string): number {
-  // Ước lượng: mỗi kỳ cách nhau khoảng 3-4 ngày (Mega quay 2 lần/tuần)
-  const from = new Date(fromDate);
-  const to = new Date(toDate);
-  const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
-  return Math.max(1, Math.round(days / 3.5));
 }
 
 /**
@@ -97,12 +92,17 @@ export function predictByFrequency(
       score: s.count / maxCount,
     }));
 
-  // Điểm tin cậy tương đối (dựa trên variance của tần suất)
+  // Độ tin cậy TƯƠNG ĐỐI (0–45): phản ánh độ phủ dữ liệu + mức lệch đều
+  // của tần suất. KHÔNG phải xác suất trúng — kết quả quay là ngẫu nhiên.
   const avgCount = stats.reduce((a, b) => a + b.count, 0) / stats.length;
   const variance =
     stats.reduce((a, b) => a + Math.pow(b.count - avgCount, 2), 0) /
     stats.length;
-  const confidence = Math.round(Math.max(20, Math.min(60, 50 - variance * 5)));
+  const cv = avgCount > 0 ? Math.sqrt(variance) / avgCount : 0;
+  const sampleFactor = Math.min(1, draws.length / 50);
+  const confidence = Math.round(
+    Math.max(10, Math.min(45, (20 + cv * 25) * (0.5 + 0.5 * sampleFactor)))
+  );
 
   return {
     numbers: topNumbers.map((t) => t.number),
@@ -128,8 +128,14 @@ export function predictByGap(
   const sorted = [...stats].sort((a, b) => b.gap - a.gap);
   const topGaps = sorted.slice(0, topN ?? rule.pickCount);
 
+  // Độ tin cậy TƯƠNG ĐỐI (0–40): gap càng lớn so với cửa sổ dữ liệu,
+  // dữ liệu càng phủ → chỉ số càng "có cơ sở thống kê để tham khảo".
+  // KHÔNG phải xác suất trúng — xác suất mỗi số không đổi giữa các kỳ.
   const maxGap = sorted[0]?.gap ?? 1;
-  const confidence = Math.round(Math.max(15, Math.min(55, 35 + maxGap * 2)));
+  const gapRatio = draws.length > 0 ? Math.min(1, maxGap / draws.length) : 0;
+  const confidence = Math.round(
+    Math.max(10, Math.min(40, 15 + gapRatio * 25 * Math.min(1, draws.length / 50)))
+  );
 
   return {
     numbers: topGaps.map((s) => s.number),
@@ -165,7 +171,15 @@ export function predictByFrequencyAndGap(
     .sort((a, b) => b.score - a.score)
     .slice(0, topN ?? rule.pickCount);
 
-  const confidence = Math.round(Math.max(20, Math.min(65, 40 + maxGap)));
+  // Điểm tin cậy TƯƠNG ĐỐI (0–45): trung bình tín hiệu tần suất + gap,
+  // trần 45 để không tạo ảo giác về độ chính xác. KHÔNG phải xác suất trúng.
+  const gapRatio = draws.length > 0 ? Math.min(1, maxGap / draws.length) : 0;
+  const confidence = Math.round(
+    Math.max(
+      10,
+      Math.min(45, 15 + gapRatio * 30 * Math.min(1, draws.length / 50))
+    )
+  );
 
   return {
     numbers: topNumbers.map((t) => t.number),

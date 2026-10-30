@@ -1,21 +1,40 @@
 /**
  * Scraper cho trang English của vietlott.vn
  * ============================================================
- * ĐÃ XÁC MINH (27/10/2026): https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645
+ * ĐÃ XÁC MINH (29/10/2026): https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645
  *
  * Cấu trúc HTML chính xác đã quan sát:
  *   <H5>Draw ID <b>#01580</b> Date <b>25/10/2026</b></H5>
  *   <span class="bong_tron">04</span><span class="bong_tron">13</span>...
  *   <h3>16.103.186.000</h3>
  *
- * Các nguồn fallback:
- *   - API nội bộ Vietlott: /ajax-pro/Mega645Controller/getLastResult (POST)
+ * Nguồn backfill (đã xác minh 30/10/2026):
+ *   - https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/winning-number-645
+ *   - https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/winning-number-655
+ *   Hai trang này chứa bảng TOÀN BỘ lịch sử (date, draw id, 6 số, bonus)
+ *   → 1 request duy nhất để backfill cả nghìn kỳ, không cần crawl từng kỳ.
+ *   (Trang chi tiết chỉ nhận kỳ qua ajaxpro cần session/token — không dùng được.)
  */
 
+import { getConfig } from "@/lib/config";
 import { DrawResult, LotteryType } from "@/types/lottery";
 
 const USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+/** Trang kết quả mới nhất + trang lịch sử đầy đủ cho từng loại hình */
+const PAGE_URLS: Record<LotteryType, { latest: string; history: string }> = {
+  MEGA_645: {
+    latest: "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645",
+    history:
+      "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/winning-number-645",
+  },
+  POWER_655: {
+    latest: "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/655",
+    history:
+      "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/winning-number-655",
+  },
+} as const;
 
 interface ScrapeResult {
   success: boolean;
@@ -24,12 +43,23 @@ interface ScrapeResult {
   previousDrawId?: string; // dùng để scrape tiếp kỳ trước
 }
 
+interface ScrapeHistoryResult {
+  success: boolean;
+  draws?: DrawResult[]; // mới nhất trước
+  error?: string;
+}
+
+/** Fetch + retry với delay tăng dần — cấu hình qua config.dataSource */
 async function fetchWithRetry(
   url: string,
-  retries: number = 3,
-  delayMs: number = 2000
+  retries?: number,
+  delayMs?: number
 ): Promise<{ ok: boolean; body: string; status: number }> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
+  const cfg = getConfig().dataSource;
+  const maxAttempts = retries ?? cfg.maxRetries;
+  const delay = delayMs ?? cfg.retryDelayMs;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const res = await fetch(url, {
         headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
@@ -38,38 +68,8 @@ async function fetchWithRetry(
       const body = await res.text();
       return { ok: res.ok, body, status: res.status };
     } catch {
-      if (attempt === retries) return { ok: false, body: "", status: 0 };
-      await new Promise((r) => setTimeout(r, delayMs * attempt));
-    }
-  }
-  return { ok: false, body: "", status: 0 };
-}
-
-async function fetchPostWithRetry(
-  url: string,
-  body: string,
-  retries: number = 3,
-  delayMs: number = 2000
-): Promise<{ ok: boolean; body: string; status: number }> {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "User-Agent": USER_AGENT,
-          "Content-Type": "application/json",
-          Accept: "application/json, text/javascript",
-          "X-Requested-With": "XMLHttpRequest",
-          "Content-Length": `${Buffer.byteLength(body)}`,
-        },
-        body,
-        signal: AbortSignal.timeout(15000),
-      });
-      const text = await res.text();
-      return { ok: res.ok, body: text, status: res.status };
-    } catch {
-      if (attempt === retries) return { ok: false, body: "", status: 0 };
-      await new Promise((r) => setTimeout(r, delayMs * attempt));
+      if (attempt === maxAttempts) return { ok: false, body: "", status: 0 };
+      await new Promise((r) => setTimeout(r, delay * attempt));
     }
   }
   return { ok: false, body: "", status: 0 };
@@ -145,7 +145,8 @@ export function parseMega645(html: string): ScrapeResult {
 /**
  * Parse kết quả Power 6/55 — tương tự Mega 6/45
  * Power 6/55: 6 số chính (1-55) + 1 số đặc biệt bonus (1-55)
- * Cấu trúc HTML tương tự, có thêm class phân biệt
+ * Cấu trúc HTML đã xác minh: 6 span bong_tron (chính), rồi dấu phân cách
+ * (<i>|</i> hoặc <span class="bong_tron-sperator">|</span>), rồi span bonus.
  */
 /** Parse Power 6/55 từ HTML — export cho unit tests */
 export function parsePower655(html: string): ScrapeResult {
@@ -160,14 +161,24 @@ export function parsePower655(html: string): ScrapeResult {
     return { success: false, error: "Không tìm thấy Date" };
   const drawDate = `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`;
 
-  // Tất cả số: bong_tron (6 số chính) + bong_tron_special (bonus)
-  // Power 6/55 có thể dùng class khác, lấy 7 số đầu (6 chính + 1 bonus)
-  const allBalls = Array.from(
-    html.matchAll(/bong_tron[^>]*>\s*(\d{1,2})\s*</g),
+  // Tách phần trước/sau dấu phân tách bonus (span.bong_tron-sperator hoặc <i>|</i>)
+  const sepIdx = html.search(/bong_tron-sperator|<i>\|<\/i>/);
+  const mainHtml = sepIdx === -1 ? html : html.substring(0, sepIdx);
+  const bonusHtml = sepIdx === -1 ? "" : html.substring(sepIdx);
+
+  // Số chính: 6 số bong_tron TRƯỚC dấu phân cách (loại trừ bonus)
+  const mainBalls = Array.from(
+    mainHtml.matchAll(/bong_tron[^>]*>\s*(\d{1,2})\s*</g),
     (m) => parseInt(m[1], 10)
-  );
-  const mainNumbers = allBalls.slice(0, 6).filter((n) => n >= 1 && n <= 55);
-  const bonusNumber = allBalls[6];
+  ).filter((n) => n >= 1 && n <= 55);
+
+  // Bonus: span bong_tron ĐẦU TIÊN sau dấu phân cách — validate phạm vi 1–55
+  const bonusMatch = bonusHtml.match(/bong_tron[^>]*>\s*(\d{1,2})\s*</);
+  const bonusParsed = bonusMatch ? parseInt(bonusMatch[1], 10) : NaN;
+  const bonusNumber =
+    Number.isInteger(bonusParsed) && bonusParsed >= 1 && bonusParsed <= 55
+      ? bonusParsed
+      : undefined;
 
   // Jackpot
   let jackpot = 0;
@@ -182,10 +193,10 @@ export function parsePower655(html: string): ScrapeResult {
 
   const prevMatch = html.match(/ClientDrawResult\s*\(\s*['"](\d+)['"]\s*\)/);
 
-  if (mainNumbers.length < 6)
+  if (mainBalls.length < 6)
     return {
       success: false,
-      error: `Chỉ tìm thấy ${mainNumbers.length} số chính (< 6)`,
+      error: `Chỉ tìm thấy ${mainBalls.length} số chính (< 6)`,
     };
 
   return {
@@ -196,7 +207,7 @@ export function parsePower655(html: string): ScrapeResult {
       drawNumber: `PXSH-${drawId}`,
       lotteryType: "POWER_655",
       drawDate,
-      numbers: mainNumbers,
+      numbers: mainBalls.slice(0, 6),
       bonusNumber,
       jackpot,
       published: true,
@@ -233,64 +244,232 @@ async function scrapeFromPage(
 }
 
 /**
- * Scrape kết quả mới nhất — thử nhiều nguồn theo thứ tự ưu tiên
+ * Scrape kết quả mới nhất từ trang chi tiết (1 kỳ)
  */
 export async function scrapeLatest(
   lotteryType: LotteryType
 ): Promise<ScrapeResult> {
-  const pages: Array<{ name: string; url: string }> =
-    lotteryType === "MEGA_645"
-      ? [
-          {
-            name: "vietlott_en",
-            url: "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645",
-          },
-        ]
-      : [
-          {
-            name: "vietlott_en",
-            url: "https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/655",
-          },
-        ];
+  const { ok, body, status } = await fetchWithRetry(PAGE_URLS[lotteryType].latest);
+  if (!ok) return { success: false, error: `HTTP ${status}: Không truy cập được` };
 
-  const errors: string[] = [];
-  for (const page of pages) {
-    const result = await scrapeFromPage(page.url, lotteryType);
-    if (result.success) return result;
-    errors.push(`${page.name}: ${result.error}`);
+  // Kiểm tra page hợp lệ
+  if (
+    body.length < 1000 ||
+    body.includes("captcha") ||
+    body.includes("401 Authorization")
+  )
+    return { success: false, error: `Trang bị chặn (${body.length} bytes)` };
+
+  if (!body.includes("Draw ID"))
+    return {
+      success: false,
+      error: "Trang không chứa kết quả — cấu trúc có thể đã thay đổi",
+    };
+
+  const parser = lotteryType === "MEGA_645" ? parseMega645 : parsePower655;
+  return parser(body);
+}
+
+/**
+ * Parse trang lịch sử đầy đủ (winning-number-645/655) — bảng chứa TẤT CẢ các kỳ.
+ * Cấu trúc đã xác minh mỗi <tr>:
+ *   <td>28/10/2026</td>
+ *   <td><a href=".../645?id=01581&nocatche=1">01581</a></td>
+ *   <td><span class="bong_tron">01</span>...x6 [(<i>|</i> hoặc bong_tron-sperator) + span bonus]</td>
+ *
+ * Trả về danh sách sắp xếp MỚI NHẤT TRƯỚC. Jackpot không có trên bảng
+ * lịch sử → để 0 (được cập nhật ở lần sync chi tiết kế tiếp với kỳ mới nhất).
+ */
+export function parseHistoryPage(
+  html: string,
+  lotteryType: LotteryType
+): ScrapeHistoryResult {
+  const rule = lotteryType === "MEGA_645" ? { max: 45, prefix: "MXSH" } : { max: 55, prefix: "PXSH" };
+
+  const rows = Array.from(html.matchAll(/<tr>([\s\S]*?)<\/tr>/g), (m) => m[1]);
+  const draws: DrawResult[] = [];
+
+  for (const row of rows) {
+    const dateMatch = row.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    const idMatch = row.match(/\?id=(\d+)/);
+    if (!dateMatch || !idMatch) continue;
+
+    // Tách main/bonus tại dấu phân cách (nếu có) — chỉ áp dụng cho Power 6/55
+    const sepIdx = row.search(/bong_tron-sperator|<i>\|<\/i>/);
+    const mainHtml = sepIdx === -1 ? row : row.substring(0, sepIdx);
+    const bonusHtml = sepIdx === -1 ? "" : row.substring(sepIdx);
+
+    const mainBalls = Array.from(
+      mainHtml.matchAll(/bong_tron[^>]*>\s*(\d{1,2})\s*</g),
+      (m) => parseInt(m[1], 10)
+    ).filter((n) => n >= 1 && n <= rule.max);
+
+    if (mainBalls.length < 6) continue; // hàng dị thường → bỏ, không fail cả trang
+
+    let bonusNumber: number | undefined;
+    if (lotteryType === "POWER_655") {
+      const bonusMatch = bonusHtml.match(/bong_tron[^>]*>\s*(\d{1,2})\s*</);
+      const bonusParsed = bonusMatch ? parseInt(bonusMatch[1], 10) : NaN;
+      if (
+        Number.isInteger(bonusParsed) &&
+        bonusParsed >= 1 &&
+        bonusParsed <= rule.max
+      ) {
+        bonusNumber = bonusParsed;
+      }
+    }
+
+    draws.push({
+      id: 0,
+      drawNumber: `${rule.prefix}-${idMatch[1].padStart(5, "0")}`,
+      lotteryType,
+      drawDate: `${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}`,
+      numbers: mainBalls.slice(0, 6),
+      bonusNumber,
+      jackpot: 0,
+      published: true,
+    });
   }
 
-  return {
-    success: false,
-    error: `Tất cả nguồn đều thất bại:\n  ${errors.join("\n  ")}`,
+  if (draws.length === 0)
+    return {
+      success: false,
+      error: "Không parse được kỳ nào từ trang lịch sử — cấu trúc có thể đã thay đổi",
+    };
+
+  // Trang hiển thị mới nhất trước — đảm bảo bất biến thứ tự
+  draws.sort((a, b) => (a.drawDate < b.drawDate ? 1 : a.drawDate > b.drawDate ? -1 : 0));
+
+  return { success: true, draws };
+}
+
+/**
+ * Scrape TOÀN BỘ lịch sử từ trang winning-number (1 request duy nhất).
+ * Dùng cho backfill lần đầu — DB trống hoặc thiếu dữ liệu.
+ */
+export async function scrapeHistory(
+  lotteryType: LotteryType
+): Promise<ScrapeHistoryResult> {
+  const { ok, body, status } = await fetchWithRetry(
+    PAGE_URLS[lotteryType].history
+  );
+  if (!ok)
+    return { success: false, error: `HTTP ${status}: Không truy cập được trang lịch sử` };
+
+  if (body.length < 1000 || body.includes("captcha"))
+    return { success: false, error: `Trang lịch sử bị chặn (${body.length} bytes)` };
+
+  return parseHistoryPage(body, lotteryType);
+}
+
+// ============================================================
+// Backfill theo chuỗi kỳ (ajaxpro — đã xác minh hoạt động 30/10/2026)
+// ============================================================
+
+/**
+ * WebPart ajaxpro trang chi tiết cho từng loại hình.
+ * Key lấy từ JS của trang (ClientDrawResult → ServerSideDrawResult(ORenderInfo,'KEY',DrawId)).
+ */
+const DETAIL_WEBPARTS: Record<LotteryType, { type: string; key: string }> = {
+  MEGA_645: { type: "Game645ResultDetailWebPart", key: "69c140a0" },
+  POWER_655: { type: "Game655ResultDetailWebPart", key: "e0a60505" },
+};
+
+/** ORenderInfo đầy đủ (lấy từ endpoint WebEnvironments.ServerSideFrontEndCreateRenderInfo — đã xác minh) */
+const ORENDER_INFO = {
+  SiteId: "main.frontend.vi",
+  SiteAlias: "main.vi",
+  UserSessionId: "",
+  SiteLang: "en",
+  IsPageDesign: false,
+  ExtraParam1: "",
+  ExtraParam2: "",
+  ExtraParam3: "",
+  SiteURL: "",
+  WebPage: null,
+  SiteName: "Vietlott",
+  OrgPageAlias: null,
+  PageAlias: null,
+  FullPageAlias: null,
+  RefKey: null,
+  System: 1,
+} as const;
+
+interface AjaxProValue {
+  value?: {
+    Error?: boolean;
+    InfoMessage?: string | null;
+    /** HTML chi tiết kỳ (chứa Draw ID, Date, balls, nút kỳ trước) */
+    RetExtraParam1?: string | null;
   };
 }
 
 /**
- * Scrape kết quả cụ thể theo Draw ID (dùng ClientDrawResult API)
+ * Scrape chi tiết 1 kỳ theo Draw ID qua ajaxpro ServerSideDrawResult.
+ * Không cần cookie/session — đã xác minh. Trả về kỳ + previousDrawId
+ * để dùng làm chuỗi backfill (kỳ trước của kỳ trước...).
  */
-export async function scrapeByDrawId(
+export async function scrapeDrawDetail(
   lotteryType: LotteryType,
   drawId: string
 ): Promise<ScrapeResult> {
-  // Vietlott sử dụng hàm JS ClientDrawResult(id) để navigate
-  // Thử load trang với hash hoặc query param
-  const pages = [
-    `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/${
-      lotteryType === "MEGA_645" ? "645" : "655"
-    }?id=${drawId}`,
-    `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/${
-      lotteryType === "MEGA_645" ? "645" : "655"
-    }#${drawId}`,
-  ];
+  const wp = DETAIL_WEBPARTS[lotteryType];
+  const url = `https://vietlott.vn/ajaxpro/Vietlott.PlugIn.WebParts.${wp.type},Vietlott.PlugIn.WebParts.ashx`;
+  const body = JSON.stringify({
+    ORenderInfo: ORENDER_INFO,
+    Key: wp.key,
+    DrawId: drawId,
+  });
 
-  for (const url of pages) {
-    const result = await scrapeFromPage(url, lotteryType);
-    if (result.success) return result;
+  const cfg = getConfig().dataSource;
+  for (let attempt = 1; attempt <= cfg.maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "User-Agent": USER_AGENT,
+          "Content-Type": "text/plain; charset=UTF-8",
+          "X-AjaxPro-Method": "ServerSideDrawResult",
+          Referer: PAGE_URLS[lotteryType].latest,
+          Origin: "https://vietlott.vn",
+        },
+        body,
+        signal: AbortSignal.timeout(15000),
+      });
+
+      if (!res.ok) {
+        if (attempt < cfg.maxRetries) {
+          await new Promise((r) => setTimeout(r, cfg.retryDelayMs * attempt));
+          continue;
+        }
+        return { success: false, error: `HTTP ${res.status} khi gọi ajaxpro` };
+      }
+
+      const payload = (await res.json()) as AjaxProValue;
+      if (payload.value?.Error) {
+        return {
+          success: false,
+          error: `ajaxpro lỗi: ${payload.value.InfoMessage ?? "unknown"}`,
+        };
+      }
+
+      const html = payload.value?.RetExtraParam1 ?? "";
+      if (!html.includes("Draw ID")) {
+        return {
+          success: false,
+          error: `Kỳ ${drawId}: response không chứa kết quả (kỳ có thể không tồn tại)`,
+        };
+      }
+
+      const parser = lotteryType === "MEGA_645" ? parseMega645 : parsePower655;
+      return parser(html);
+    } catch {
+      if (attempt < cfg.maxRetries) {
+        await new Promise((r) => setTimeout(r, cfg.retryDelayMs * attempt));
+        continue;
+      }
+      return { success: false, error: `Mạng lỗi khi scrape kỳ ${drawId}` };
+    }
   }
-
-  return {
-    success: false,
-    error: `Không tìm thấy kỳ ${drawId}`,
-  };
+  return { success: false, error: `Không scrape được kỳ ${drawId}` };
 }

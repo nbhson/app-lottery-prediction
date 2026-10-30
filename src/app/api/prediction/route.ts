@@ -25,10 +25,13 @@ export async function GET(request: NextRequest) {
     const draws = getDrawHistory(type, 100, 0);
 
     if (draws.length === 0) {
-      return NextResponse.json({
-        error: "Chưa có đủ dữ liệu để dự đoán",
-        data: null,
-      });
+      return NextResponse.json(
+        {
+          error: "Chưa có đủ dữ liệu để dự đoán — vui lòng đồng bộ dữ liệu trước",
+          data: null,
+        },
+        { status: 503 }
+      );
     }
 
     let prediction: Prediction;

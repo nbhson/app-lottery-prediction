@@ -11,12 +11,18 @@ import { checkRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic"; // luôn chạy realtime, không cache
 
-/** Giới hạn 5 lần sync/phút/IP — mỗi lần kích hoạt scrape nguồn Vietlott. */
-const SYNC_RATE_LIMIT = { limit: 5, windowMs: 60_000 };
+/** Per-IP 5 lần/phút + trần tổng 10 lần/phút (mỗi lần kích hoạt scrape nguồn Vietlott). */
+const SYNC_RATE_LIMIT = { limit: 5, windowMs: 60_000, globalLimit: 10 };
 
 export async function POST(request: NextRequest) {
   try {
-    const rl = checkRateLimit("sync", request.headers, SYNC_RATE_LIMIT.limit, SYNC_RATE_LIMIT.windowMs);
+    const rl = checkRateLimit(
+      "sync",
+      request.headers,
+      SYNC_RATE_LIMIT.limit,
+      SYNC_RATE_LIMIT.windowMs,
+      { globalLimit: SYNC_RATE_LIMIT.globalLimit }
+    );
     if (rl) {
       return NextResponse.json(
         { error: "Quá nhiều yêu cầu đồng bộ. Vui lòng thử lại sau." },

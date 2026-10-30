@@ -22,7 +22,9 @@
                     └───────────┘            └─────────────┘
 ```
 
-- **Data Ingestion:** scraper tự động từ `vietlott.vn` (English version — đã xác minh hoạt động), sync khi khởi động + theo chu kỳ `DATA_SYNC_INTERVAL_MINUTES`, chống trùng lặp bằng `UNIQUE(draw_number, lottery_type)`
+- **Auto-sync:** `src/instrumentation.ts` bật scheduler khi server start (Next.js instrumentation hook) — sync ngay lúc khởi động + theo chu kỳ `DATA_SYNC_INTERVAL_MINUTES`. Khóa chống chạy song song 2 lớp: flag trong process + bản ghi `sync_log RUNNING` (an toàn khi chạy nhiều instance)
+- **Backfill:** DB thiếu dữ liệu (< 120 kỳ) → tự động backfill: 1 request trang lịch sử (winning-number-645/655) + chuỗi request chi tiết từng kỳ qua ajaxpro (đã xác minh hoạt động) cho tới khi đủ dữ liệu cho thống kê/dự đoán
+- **Data Ingestion:** scraper tự động từ `vietlott.vn` (English version — đã xác minh hoạt động), chống trùng lặp bằng `UNIQUE(draw_number, lottery_type)`
 - **AI Module:** OpenAI-compatible API (OpenAI/OpenRouter/Groq/DeepSeek/custom), cấu hình 100% qua `.env`
 - **Fallback an toàn:** AI lỗi/timeout/thiếu key → tự động trả kết quả thống kê, hiển thị trạng thái minh bạch
 
@@ -53,8 +55,8 @@
 ```bash
 npm install
 cp .env.example .env   # cấu hình AI (tùy chọn) + data source
-npm run dev            # → http://localhost:3000
-npm test               # 15 unit tests (chạy qua tsx)
+npm run dev            # → http://localhost:3000 (auto-sync + backfill tự chạy lúc start)
+npm test               # 50 unit + integration tests (chạy qua tsx)
 ```
 
 ### Cấu hình `.env`
@@ -70,9 +72,13 @@ AI_MODEL=gpt-4o-mini
 DATA_SOURCE=vietlott_en       # vietlott.vn English (đã xác minh hoạt động)
 DATA_SYNC_INTERVAL_MINUTES=30
 FETCH_MAX_RETRIES=3
+
+# Deployment (tùy chọn)
+# DATA_DIR=/var/lib/vietlott  # thư mục SQLite, mặc định <project>/data
+# TRUST_PROXY=1               # bật khi chạy sau reverse proxy đáng tin (nginx/Vercel)
 ```
 
-**Lưu ý:** Vietlott chặn IP ngoài Việt Nam — nếu chạy từ nước ngoài cần đặt server tại VN hoặc dùng proxy. Nguồn dữ liệu chính thức: `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645` (đã xác minh trả dữ liệu thật).
+**Lưu ý:** Vietlott chặn IP ngoài Việt Nam — nếu chạy từ nước ngoài cần đặt server tại VN hoặc dùng proxy. Nguồn dữ liệu chính thức: `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645` (đã xác minh trả dữ liệu thật). Lần chạy đầu app tự backfill ~120 kỳ/loại hình (~2-3 phút, chạy nền).
 
 ## Nguồn dữ liệu (không mock)
 
@@ -83,14 +89,17 @@ FETCH_MAX_RETRIES=3
 
 ## Dự đoán đa lớp
 
-1. **Thống kê** (luôn có): tần suất + khoảng trống (gap), miễn phí, tức thời
+1. **Thống kê** (luôn có): tần suất + khoảng trống (gap — đo bằng số kỳ), miễn phí, tức thời
 2. **AI** (qua `.env`): gửi ngữ cảnh (10 kỳ gần nhất + top số nóng/lạnh) cho model AI
 3. **Fallback:** AI lỗi/timeout/thiếu key → trả thống kê, hiển thị rõ lý do
+
+> **Độ tin cậy (confidence)** là chỉ số TƯƠNG ĐỐI phản ánh độ phủ dữ liệu (trần 45) —
+> KHÔNG phải xác suất trúng. Mỗi kỳ quay là sự kiện ngẫu nhiên độc lập.
 
 ## Kiểm thử
 
 ```bash
-npm test                                   # 15 unit tests (tsx --test)
+npm test                                   # 50 unit + integration tests (tsx --test)
 npm run build                              # production build
 ```
 

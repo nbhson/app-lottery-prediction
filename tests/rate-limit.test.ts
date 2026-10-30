@@ -68,28 +68,47 @@ describe("rateLimit — sliding window", () => {
   });
 });
 
-describe("getClientIp", () => {
+describe("getClientIp — chỉ tin proxy header khi TRUST_PROXY bật", () => {
   const headers = (h: Record<string, string>) => new Headers(h);
 
-  it("lấy entry đầu của x-forwarded-for", () => {
+  it("TRUST_PROXY bật → lấy entry đầu của x-forwarded-for", () => {
+    process.env.TRUST_PROXY = "1";
+    try {
+      assert.equal(
+        getClientIp(headers({ "x-forwarded-for": "203.0.113.5, 10.0.0.1" })),
+        "203.0.113.5"
+      );
+      // trim whitespace quanh IP
+      assert.equal(
+        getClientIp(headers({ "x-forwarded-for": "  198.51.100.7 , 10.0.0.1" })),
+        "198.51.100.7"
+      );
+      // fallback x-real-ip
+      assert.equal(getClientIp(headers({ "x-real-ip": "203.0.113.9" })), "203.0.113.9");
+    } finally {
+      delete process.env.TRUST_PROXY;
+    }
+  });
+
+  it("TRUST_PROXY bật = 'true' → vẫn hoạt động", () => {
+    process.env.TRUST_PROXY = "true";
+    try {
+      assert.equal(
+        getClientIp(headers({ "x-forwarded-for": "203.0.113.5" })),
+        "203.0.113.5"
+      );
+    } finally {
+      delete process.env.TRUST_PROXY;
+    }
+  });
+
+  it("TRUST_PROXY tắt (mặc định) → BỎ QUA proxy header (chống spoof), trả unknown", () => {
+    delete process.env.TRUST_PROXY;
     assert.equal(
       getClientIp(headers({ "x-forwarded-for": "203.0.113.5, 10.0.0.1" })),
-      "203.0.113.5"
+      "unknown"
     );
-  });
-
-  it("trim whitespace quanh IP", () => {
-    assert.equal(
-      getClientIp(headers({ "x-forwarded-for": "  198.51.100.7 , 10.0.0.1" })),
-      "198.51.100.7"
-    );
-  });
-
-  it("fallback x-real-ip", () => {
-    assert.equal(getClientIp(headers({ "x-real-ip": "203.0.113.9" })), "203.0.113.9");
-  });
-
-  it("không có header nào → unknown", () => {
+    assert.equal(getClientIp(headers({ "x-real-ip": "203.0.113.9" })), "unknown");
     assert.equal(getClientIp(headers({})), "unknown");
   });
 });
@@ -106,5 +125,29 @@ describe("rateLimitKey + checkRateLimit", () => {
     assert.notEqual(blocked, null);
     assert.equal(blocked?.ok, false);
     assert.ok((blocked?.retryAfter ?? 0) > 0);
+  });
+});
+
+describe("checkRateLimit — global cap chống xoay IP", () => {
+  it("per-IP còn slot nhưng vượt trần tổng → vẫn bị chặn", () => {
+    // Mỗi request một "IP" khác nhau (spoofed xff) — per-IP không bao giờ chạm limit 100
+    for (let i = 0; i < 3; i++) {
+      const h = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
+      const r = checkRateLimit("global-route", h, 100, 60_000, { globalLimit: 3 });
+      assert.equal(r, null, `request ${i + 1} phải được phép`);
+    }
+    const h4 = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
+    const blocked = checkRateLimit("global-route", h4, 100, 60_000, { globalLimit: 3 });
+    assert.notEqual(blocked, null);
+    assert.equal(blocked?.ok, false);
+    assert.ok((blocked?.retryAfter ?? 0) > 0);
+  });
+
+  it("global cap không ảnh hưởng route khác", () => {
+    const h = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
+    assert.equal(
+      checkRateLimit("global-route-khac", h, 100, 60_000, { globalLimit: 1 }),
+      null
+    );
   });
 });

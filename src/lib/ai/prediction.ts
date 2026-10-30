@@ -215,12 +215,12 @@ export async function predictWithAI(
     }
   }
 
-  // Nếu AI không trả đủ số → bổ sung từ stats
+  // Nếu AI không trả đủ số → bổ sung từ stats (statNums đã loại số trùng)
   if (uniqueValid.length < rule.pickCount) {
     const statNums = statistical.numbers.filter((n) => !uniqueValid.includes(n));
     for (const n of statNums) {
       if (uniqueValid.length >= rule.pickCount) break;
-      if (!uniqueValid.includes(n)) uniqueValid.push(n);
+      uniqueValid.push(n);
     }
   }
 
