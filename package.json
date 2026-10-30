@@ -6,17 +6,19 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts tests/accuracy.test.ts tests/api-routes.test.ts tests/cache.test.ts tests/sum-stats.test.ts",
+    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts tests/accuracy.test.ts tests/api-routes.test.ts tests/cache.test.ts tests/sum-stats.test.ts tests/jackpot.test.ts",
     "lint": "eslint ."
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
+    "ioredis": "^6.0.0",
     "next": "^16.4.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^9.6.0",
+    "@types/ioredis": "^4.28.10",
     "@types/node": "^22.20.5",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

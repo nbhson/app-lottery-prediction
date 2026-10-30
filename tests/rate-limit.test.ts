@@ -118,10 +118,10 @@ describe("rateLimitKey + checkRateLimit", () => {
     assert.equal(rateLimitKey("sync", "1.2.3.4"), "sync:1.2.3.4");
   });
 
-  it("checkRateLimit trả null khi được phép, object khi bị chặn", () => {
+  it("checkRateLimit trả null khi được phép, object khi bị chặn", async () => {
     const h = new Headers({ "x-forwarded-for": `10.1.1.${++seq}` });
-    assert.equal(checkRateLimit("route-x", h, 1, 60_000), null);
-    const blocked = checkRateLimit("route-x", h, 1, 60_000);
+    assert.equal(await checkRateLimit("route-x", h, 1, 60_000), null);
+    const blocked = await checkRateLimit("route-x", h, 1, 60_000);
     assert.notEqual(blocked, null);
     assert.equal(blocked?.ok, false);
     assert.ok((blocked?.retryAfter ?? 0) > 0);
@@ -129,24 +129,24 @@ describe("rateLimitKey + checkRateLimit", () => {
 });
 
 describe("checkRateLimit — global cap chống xoay IP", () => {
-  it("per-IP còn slot nhưng vượt trần tổng → vẫn bị chặn", () => {
+  it("per-IP còn slot nhưng vượt trần tổng → vẫn bị chặn", async () => {
     // Mỗi request một "IP" khác nhau (spoofed xff) — per-IP không bao giờ chạm limit 100
     for (let i = 0; i < 3; i++) {
       const h = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
-      const r = checkRateLimit("global-route", h, 100, 60_000, { globalLimit: 3 });
+      const r = await checkRateLimit("global-route", h, 100, 60_000, { globalLimit: 3 });
       assert.equal(r, null, `request ${i + 1} phải được phép`);
     }
     const h4 = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
-    const blocked = checkRateLimit("global-route", h4, 100, 60_000, { globalLimit: 3 });
+    const blocked = await checkRateLimit("global-route", h4, 100, 60_000, { globalLimit: 3 });
     assert.notEqual(blocked, null);
     assert.equal(blocked?.ok, false);
     assert.ok((blocked?.retryAfter ?? 0) > 0);
   });
 
-  it("global cap không ảnh hưởng route khác", () => {
+  it("global cap không ảnh hưởng route khác", async () => {
     const h = new Headers({ "x-forwarded-for": `10.9.9.${++seq}` });
     assert.equal(
-      checkRateLimit("global-route-khac", h, 100, 60_000, { globalLimit: 1 }),
+      await checkRateLimit("global-route-khac", h, 100, 60_000, { globalLimit: 1 }),
       null
     );
   });

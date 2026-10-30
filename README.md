@@ -30,7 +30,8 @@
 - **Accuracy Tracking:** mọi dự đoán được ghi `prediction_log`; kỳ mới sync xong → tự chấm điểm (số trúng) → thống kê avgMatches / baseline random / lift (trang `/prediction` + `GET /api/accuracy`)
 - **Data Quality Audit:** kiểm tra read-only (trùng lặp, bộ số sai, đứt chuỗi draw ID) → status OK/WARN/DEGRADED, hiển thị trong `GET /api/health`
 - **Health Check:** `GET /api/health` — DB liveness (503 khi chết) + quality audit + trạng thái sync/AI, sẵn sàng cắm monitoring/load balancer
-- **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; trang chủ + lịch sử render server (SSR) — dữ liệu hiển thị ngay trong HTML đầu tiên
+- **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; các trang dữ liệu (trang chủ, lịch sử, thống kê, dự đoán) render server (SSR) — dữ liệu hiển thị ngay trong HTML đầu tiên
+- **Rate limit 2 chế độ:** in-memory (mặc định, single instance) hoặc **Redis** khi set `REDIS_URL` — chia sẻ bucket qua nhiều instance, Lua script atomic, tự fallback in-memory khi Redis lỗi
 
 ## Deploy với Docker
 
@@ -140,6 +141,7 @@ FETCH_MAX_RETRIES=3
 # DATA_DIR=/var/lib/vietlott  # thư mục SQLite, mặc định <project>/data
 # TRUST_PROXY=1               # bật khi chạy sau reverse proxy đáng tin (nginx/Vercel)
 # SYNC_API_TOKEN=<token>      # bảo vệ POST /api/sync khi deploy public
+# REDIS_URL=redis://host:6379 # rate-limit multi-instance (bỏ trống → in-memory)
 ```
 
 **Lưu ý:** Vietlott chặn IP ngoài Việt Nam — nếu chạy từ nước ngoài cần đặt server tại VN hoặc dùng proxy. Nguồn dữ liệu chính thức: `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645` (đã xác minh trả dữ liệu thật). Lần chạy đầu app tự backfill ~120 kỳ/loại hình (~2-3 phút, chạy nền).
@@ -150,6 +152,9 @@ FETCH_MAX_RETRIES=3
 - Parser dựa trên class `bong_tron` (số kết quả) — có validation chặt (số lượng, phạm vi 1-45/1-55)
 - Khi trang thay đổi cấu trúc → sync fail an toàn, ghi log, UI hiển thị trạng thái
 - Chống trùng lặp: `INSERT OR IGNORE` + `UNIQUE(draw_number, lottery_type)`
+- **Jackpot tích lũy:** chỉ trang kết quả mới nhất của vietlott.vn có giá trị jackpot
+  (các kỳ backfill = 0) — mỗi chu kỳ sync, khi bắt lại kỳ đã có trong DB mà jackpot
+  đang = 0, hệ thống tự cập nhật → jackpot tích lũy dần theo thời gian chạy app
 
 ## Dự đoán đa lớp
 

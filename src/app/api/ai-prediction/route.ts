@@ -17,7 +17,7 @@ const AI_RATE_LIMIT = { limit: 10, windowMs: 60_000, globalLimit: 60 };
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   try {
-    const rl = checkRateLimit(
+    const rl = await checkRateLimit(
       "ai-prediction",
       request.headers,
       AI_RATE_LIMIT.limit,

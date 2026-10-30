@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  predictByFrequency,
-  predictByGap,
-  predictByFrequencyAndGap,
-  getHotAndColdNumbers,
-} from "@/lib/prediction";
-import { getDrawHistory, insertPredictionLog } from "@/lib/db";
-import { Prediction, LOTTERY_RULES } from "@/types/lottery";
+import { LOTTERY_RULES } from "@/types/lottery";
 import { parseLotteryTypeParam } from "@/lib/validate";
-import { cacheGet, cacheSet, drawsCacheKey } from "@/lib/cache";
+import { computePrediction, parsePredictionMethod } from "@/lib/prediction-service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,77 +13,19 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-    const method = searchParams.get("method") ?? "FREQUENCY_AND_GAP";
+    const method = parsePredictionMethod(searchParams.get("method"));
     const count = parseInt(searchParams.get("count") ?? "6");
 
-    const draws = getDrawHistory(type, 100, 0);
+    const result = computePrediction(type, method, count);
 
-    if (draws.length === 0) {
+    if ("error" in result) {
       return NextResponse.json(
-        {
-          error: "Chưa có đủ dữ liệu để dự đoán — vui lòng đồng bộ dữ liệu trước",
-          data: null,
-        },
+        { error: result.error, data: null },
         { status: 503 }
       );
     }
 
-    let prediction: Prediction;
-
-    switch (method) {
-      case "FREQUENCY":
-        prediction = predictByFrequency(type, draws, count);
-        break;
-      case "GAP":
-        prediction = predictByGap(type, draws, count);
-        break;
-      case "FREQUENCY_AND_GAP":
-      default:
-        prediction = predictByFrequencyAndGap(type, draws, count);
-        break;
-    }
-
-    // Đảm bảo số lượng đúng quy tắc
-    const rule = LOTTERY_RULES[type];
-    const finalNumbers = prediction.numbers.slice(0, rule.pickCount);
-
-    // Accuracy tracking: ghi log dự đoán (chờ kỳ mới để chấm điểm).
-    // insertPredictionLog không bao giờ throw — lỗi log không ảnh hưởng response.
-    if (draws[0]) {
-      insertPredictionLog({
-        lotteryType: type,
-        method: prediction.method,
-        numbers: finalNumbers,
-        confidence: prediction.confidence,
-        afterDrawNumber: draws[0].drawNumber,
-        afterDrawDate: draws[0].drawDate,
-      });
-    }
-
-    // Lấy thêm số nóng/lạnh (cache 60s — tránh tính lại frequency trên 100 kỳ mỗi request)
-    const hotColdKey = drawsCacheKey("hotcold", type, 10);
-    const hotCold =
-      cacheGet<ReturnType<typeof getHotAndColdNumbers>>(hotColdKey) ??
-      (() => {
-        const result = getHotAndColdNumbers(type, 10);
-        cacheSet(hotColdKey, result);
-        return result;
-      })();
-
-    return NextResponse.json({
-      data: {
-        ...prediction,
-        numbers: finalNumbers,
-      },
-      hotNumbers: hotCold.hot,
-      coldNumbers: hotCold.cold,
-      meta: {
-        lotteryType: type,
-        lotteryName: rule.nameVi,
-        historyCount: draws.length,
-        availableMethods: ["FREQUENCY", "GAP", "FREQUENCY_AND_GAP"],
-      },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error generating prediction:", error);
     return NextResponse.json(

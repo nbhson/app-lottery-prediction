@@ -278,6 +278,38 @@ export function insertDrawsMany(
   return inserted;
 }
 
+/**
+ * Cập nhật jackpot cho kỳ đã tồn tại nhưng đang = 0.
+ *
+ * Bối cảnh: chỉ trang kết quả MỚI NHẤT của vietlott.vn có giá trị jackpot —
+ * các kỳ backfill (trang lịch sử + ajaxpro chi tiết) luôn jackpot = 0.
+ * Mỗi chu kỳ sync, khi scrapeLatest bắt lại một kỳ cũ đã có trong DB,
+ * gọi hàm này để tích lũy jackpot dần theo thời gian.
+ *
+ * @returns true nếu đã cập nhật (kỳ tồn tại, jackpot cũ = 0, jackpot mới > 0)
+ */
+export function updateJackpotIfMissing(
+  drawNumber: string,
+  lotteryType: LotteryType,
+  jackpot: number
+): boolean {
+  if (!jackpot || jackpot <= 0) return false;
+
+  const result = getDb()
+    .prepare(
+      `
+      UPDATE draws
+      SET jackpot = ?
+      WHERE draw_number = ? AND lottery_type = ? AND jackpot = 0
+    `
+    )
+    .run(jackpot, drawNumber, lotteryType);
+
+  const updated = result.changes > 0;
+  if (updated) invalidateDrawsCache();
+  return updated;
+}
+
 // ============================================================
 // Truy vấn
 // ============================================================

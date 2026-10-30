@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const rl = checkRateLimit(
+    const rl = await checkRateLimit(
       "sync",
       request.headers,
       SYNC_RATE_LIMIT.limit,

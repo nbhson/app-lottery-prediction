@@ -29,6 +29,7 @@ import {
   startSyncLog,
   finishSyncLog,
   getSyncLogs,
+  updateJackpotIfMissing,
 } from "@/lib/db";
 import { gradePredictionsForNewDraw } from "@/lib/accuracy";
 import { LotteryType } from "@/types/lottery";
@@ -117,6 +118,9 @@ export async function syncLotteryType(
       (existing.drawNumber === draw.drawNumber ||
         existing.drawDate >= draw.drawDate)
     ) {
+      // Tích lũy jackpot: kỳ đã có trong DB (backfill) nhưng jackpot = 0 —
+      // scrapeLatest là nguồn duy nhất có giá trị này
+      updateJackpotIfMissing(draw.drawNumber, lotteryType, draw.jackpot);
       setSyncStatus({
         connected: true,
         source: "vietlott.vn (EN)",
@@ -147,6 +151,11 @@ export async function syncLotteryType(
       jackpot: draw.jackpot,
       published: draw.published,
     });
+
+    // Kỳ đã tồn tại (chèn trước đó bởi backfill, jackpot = 0) → tích lũy jackpot
+    if (!inserted) {
+      updateJackpotIfMissing(draw.drawNumber, lotteryType, draw.jackpot);
+    }
 
     // Accuracy tracking: kỳ MỚI được chèn → chấm các dự đoán đang chờ
     // (backfill các kỳ cũ có after_draw_date >= drawDate nên không bị chấm nhầm)
