@@ -12,6 +12,7 @@ import Database from "better-sqlite3";
 import fs from "fs";
 import path from "path";
 import { DrawResult, LotteryType, DataSourceStatus } from "@/types/lottery";
+import { invalidateDrawsCache } from "@/lib/cache";
 
 /**
  * Thư mục chứa DB — override qua DATA_DIR (hữu ích khi chạy standalone/ Docker,
@@ -231,7 +232,9 @@ export function upsertDraw(draw: Omit<DrawResult, "id">): { inserted: boolean } 
       published: draw.published ? 1 : 0,
     });
 
-  return { inserted: result.changes > 0 };
+  const inserted = result.changes > 0;
+  if (inserted) invalidateDrawsCache();
+  return { inserted };
 }
 
 /**
@@ -271,6 +274,7 @@ export function insertDrawsMany(
   );
 
   insertAll(draws);
+  if (inserted > 0) invalidateDrawsCache();
   return inserted;
 }
 

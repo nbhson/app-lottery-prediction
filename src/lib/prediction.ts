@@ -16,6 +16,8 @@ import {
   LOTTERY_RULES,
   PairStat,
   PairMatrixResult,
+  SumStats,
+  SumPoint,
 } from "@/types/lottery";
 import { getDrawHistory } from "./db";
 
@@ -291,4 +293,54 @@ export function calculateTrend(
     .slice(0, top);
 
   return { window: recent.length, hot, cold, drawsAnalyzed: recent.length };
+}
+
+/**
+ * Phân tích tổng bộ số theo kỳ (cửa sổ N kỳ gần nhất, mặc định 50).
+ * `draws` phải sắp xếp mới nhất trước (đúng thứ tự getDrawHistory trả về).
+ * Trả về points theo thứ tự cũ nhất → mới nhất để vẽ line chart.
+ *
+ * Tổng bộ số là chỉ số mô tả quá khứ — KHÔNG có ý nghĩa dự đoán
+ * (mọi bộ số cùng xác suất), dùng để trực quan hóa phân phối.
+ */
+export function calculateSumStats(
+  draws: DrawResult[],
+  lotteryType: LotteryType,
+  windowSize: number = 50
+): SumStats {
+  const rule = LOTTERY_RULES[lotteryType];
+  const recent = draws.slice(0, Math.max(1, Math.min(windowSize, draws.length)));
+
+  const points: SumPoint[] = recent
+    .map((d) => {
+      const sum = d.numbers.reduce((acc, n) => acc + n, 0);
+      const even = d.numbers.filter((n) => n % 2 === 0).length;
+      return {
+        drawNumber: d.drawNumber,
+        drawDate: d.drawDate,
+        sum,
+        even,
+        odd: d.numbers.length - even,
+      };
+    })
+    // cũ nhất trước để trục X chạy theo thời gian tăng dần
+    .reverse();
+
+  const sums = points.map((p) => p.sum);
+  const pick = rule.pickCount;
+  // Tổng nhỏ/lớn nhất có thể: pick số nhỏ nhất / lớn nhất liên tiếp
+  const theoreticalMin = (rule.minNumber + (rule.minNumber + pick - 1)) * pick / 2;
+  const theoreticalMax = (rule.maxNumber - pick + 1 + rule.maxNumber) * pick / 2;
+
+  return {
+    points,
+    min: sums.length > 0 ? Math.min(...sums) : theoreticalMin,
+    max: sums.length > 0 ? Math.max(...sums) : theoreticalMax,
+    avg:
+      sums.length > 0
+        ? Math.round((sums.reduce((a, b) => a + b, 0) / sums.length) * 10) / 10
+        : 0,
+    theoreticalMin,
+    theoreticalMax,
+  };
 }

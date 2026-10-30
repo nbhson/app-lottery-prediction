@@ -8,6 +8,7 @@ import {
 import { getDrawHistory, insertPredictionLog } from "@/lib/db";
 import { Prediction, LOTTERY_RULES } from "@/types/lottery";
 import { parseLotteryTypeParam } from "@/lib/validate";
+import { cacheGet, cacheSet, drawsCacheKey } from "@/lib/cache";
 
 export async function GET(request: NextRequest) {
   try {
@@ -66,8 +67,15 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Lấy thêm số nóng/lạnh
-    const hotCold = getHotAndColdNumbers(type, 10);
+    // Lấy thêm số nóng/lạnh (cache 60s — tránh tính lại frequency trên 100 kỳ mỗi request)
+    const hotColdKey = drawsCacheKey("hotcold", type, 10);
+    const hotCold =
+      cacheGet<ReturnType<typeof getHotAndColdNumbers>>(hotColdKey) ??
+      (() => {
+        const result = getHotAndColdNumbers(type, 10);
+        cacheSet(hotColdKey, result);
+        return result;
+      })();
 
     return NextResponse.json({
       data: {

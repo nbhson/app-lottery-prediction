@@ -30,6 +30,7 @@
 - **Accuracy Tracking:** mọi dự đoán được ghi `prediction_log`; kỳ mới sync xong → tự chấm điểm (số trúng) → thống kê avgMatches / baseline random / lift (trang `/prediction` + `GET /api/accuracy`)
 - **Data Quality Audit:** kiểm tra read-only (trùng lặp, bộ số sai, đứt chuỗi draw ID) → status OK/WARN/DEGRADED, hiển thị trong `GET /api/health`
 - **Health Check:** `GET /api/health` — DB liveness (503 khi chết) + quality audit + trạng thái sync/AI, sẵn sàng cắm monitoring/load balancer
+- **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; trang chủ render server (SSR) — kết quả hiển thị ngay trong HTML đầu tiên
 
 ## Tính năng
 
@@ -39,7 +40,7 @@
 | `/history` | Lịch sử kết quả, phân trang |
 | `/prediction` | Dự đoán thống kê (tần suất / gap / kết hợp) + **độ chính xác dự đoán** |
 | `/prediction/ai` | Dự đoán AI + thống kê kết hợp, có số yêu thích |
-| `/stats` | Thống kê nâng cao: tần suất đầy đủ, heatmap cặp số, xu hướng nóng/lạnh |
+| `/stats` | Thống kê nâng cao: tần suất đầy đủ, heatmap cặp số, xu hướng nóng/lạnh, tổng bộ số theo kỳ |
 | `/about` | Cảnh báo rủi ro, điều khoản |
 
 ## API
@@ -103,7 +104,7 @@ kẻ lạ không thể đốt trần tổng. Chưa cấu hình token → sync m�
 npm install
 cp .env.example .env   # cấu hình AI (tùy chọn) + data source + SYNC_API_TOKEN (khuyến nghị)
 npm run dev            # → http://localhost:3000 (auto-sync + backfill tự chạy lúc start)
-npm test               # 66 unit + integration tests (chạy qua tsx)
+npm test               # 77 unit + integration tests (chạy qua tsx)
 ```
 
 ### Cấu hình `.env`
@@ -147,7 +148,7 @@ FETCH_MAX_RETRIES=3
 ## Kiểm thử
 
 ```bash
-npm test                                   # 66 unit + integration tests (tsx --test)
+npm test                                   # 77 unit + integration tests (tsx --test)
 npm run lint                               # ESLint 9 (flat config — Next 16 đã xóa `next lint`)
 npm run build                              # production build (Turbopack)
 
@@ -158,8 +159,9 @@ set -a; source .env; set +a; npx tsx scripts/ai-smoke.ts [MEGA_645|POWER_655]
 ## Stack
 
 - **Next.js 16** (App Router, Turbopack) + **React 19**
-- **SQLite** (better-sqlite3) — WAL mode
-- **ESLint 9** — flat config `eslint.config.mjs`
+- **SQLite** (better-sqlite3 v13) — WAL mode
+- **ESLint 10** — flat config `eslint.config.mjs`
+- **TypeScript 5.9** (TS 7 native tạm chờ hệ sinh thái typescript-eslint hỗ trợ)
 - Node.js ≥ 20.9 (khuyến nghị 22)
 
 ## UI/UX

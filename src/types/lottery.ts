@@ -103,3 +103,26 @@ export interface PairMatrixResult {
   maxCount: number;
   drawsAnalyzed: number;
 }
+
+// ============================================================
+// Phân tích bộ số (tổng 6 số, chẵn/lẻ)
+// ============================================================
+
+/** Điểm dữ liệu tổng bộ số của 1 kỳ (dùng cho line chart, sắp xếp cũ nhất trước) */
+export interface SumPoint {
+  drawNumber: string;
+  drawDate: string;
+  sum: number;
+  even: number; // số lượng số chẵn trong bộ
+  odd: number; // số lượng số lẻ
+}
+
+/** Thống kê tổng bộ số qua N kỳ gần nhất */
+export interface SumStats {
+  points: SumPoint[]; // cũ nhất → mới nhất
+  min: number;
+  max: number;
+  avg: number; // làm tròn 1 chữ số thập phân
+  theoreticalMin: number; // tổng nhỏ nhất có thể (1+2+...+6)
+  theoreticalMax: number; // tổng lớn nhất có thể
+}

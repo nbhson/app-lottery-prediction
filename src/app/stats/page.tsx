@@ -15,7 +15,8 @@ import TypeSelector from "@/components/TypeSelector";
 import StatBar from "@/components/StatBar";
 import FrequencyChart from "@/components/FrequencyChart";
 import PairHeatmap from "@/components/PairHeatmap";
-import type { PairStat } from "@/types/lottery";
+import SumTrendChart from "@/components/SumTrendChart";
+import type { PairStat, SumStats } from "@/types/lottery";
 // TREND_WINDOWS là constant nhỏ — định nghĩa local để tránh import lib/prediction
 // (chứa better-sqlite3 qua lib/db) vào bundle client
 const TREND_WINDOWS = [10, 20, 50] as const;
@@ -29,6 +30,7 @@ interface StatsResponse {
   pairs: PairStat[];
   maxPairCount: number;
   trend: { hot: FrequencyStats[]; cold: FrequencyStats[] };
+  sumStats?: SumStats;
 }
 
 /** Top cặp đồng xuất hiện nhiều nhất */
@@ -121,7 +123,26 @@ export default function StatsPage() {
             <FrequencyChart stats={stats.frequency} />
           </section>
 
-          {/* 2. Ma trận cặp số */}
+          {/* 2. Tổng bộ số theo kỳ */}
+          {stats.sumStats && stats.sumStats.points.length > 0 && (
+            <section className="card" aria-label="Biểu đồ tổng bộ số">
+              <div className="card-header">
+                <h2>📈 Tổng bộ số theo kỳ</h2>
+                <span className="badge badge-neutral">
+                  {stats.sumStats.points.length} kỳ gần nhất
+                </span>
+              </div>
+              <p className="text-xs-muted" style={{ marginBottom: "var(--space-3)" }}>
+                Điểm xanh = bộ có đa số chẵn, đỏ = đa số lẻ. Tổng trung bình:{" "}
+                <strong>{stats.sumStats.avg}</strong> (biên lý thuyết{" "}
+                {stats.sumStats.theoreticalMin}–{stats.sumStats.theoreticalMax}).
+                Chỉ là mô tả quá khứ — mọi bộ số cùng xác suất.
+              </p>
+              <SumTrendChart points={stats.sumStats.points} />
+            </section>
+          )}
+
+          {/* 3. Ma trận cặp số */}
           <section className="card" aria-label="Heatmap cặp số">
             <div className="card-header">
               <h2>🔥 Ma trận cặp số cùng xuất hiện</h2>
@@ -156,7 +177,7 @@ export default function StatsPage() {
             )}
           </section>
 
-          {/* 3. Xu hướng nóng/lạnh theo cửa sổ 10/20/50 kỳ */}
+          {/* 4. Xu hướng nóng/lạnh theo cửa sổ 10/20/50 kỳ */}
           <section className="card" aria-label="Xu hướng nóng lạnh">
             <div className="card-header">
               <h2>Xu hướng nóng / lạnh</h2>

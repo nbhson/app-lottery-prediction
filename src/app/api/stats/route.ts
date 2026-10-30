@@ -14,8 +14,10 @@ import {
   calculateFrequencyStats,
   calculatePairMatrix,
   calculateTrend,
+  calculateSumStats,
   TREND_WINDOWS,
 } from "@/lib/prediction";
+import { cacheGet, cacheSet, drawsCacheKey } from "@/lib/cache";
 
 const MAX_DRAWS = 500;
 
@@ -35,13 +37,22 @@ export async function GET(request: NextRequest) {
       ? windowParam
       : 20;
 
+    // Cache kết quả thống kê (tính toán nặng trên 500 kỳ) — TTL 60s,
+    // tự invalidate khi sync chèn kỳ mới (xem db.ts → invalidateDrawsCache)
+    const cacheKey = drawsCacheKey("stats", type, window);
+    const cached = cacheGet<unknown>(cacheKey);
+    if (cached) {
+      return NextResponse.json(cached);
+    }
+
     // Toàn bộ lịch sử (tối đa 500 kỳ) cho tần suất + ma trận cặp
     const draws = getDrawHistory(type, 500, 0);
     const frequency = calculateFrequencyStats(draws, type);
     const pairMatrix = calculatePairMatrix(draws, type);
     const trend = calculateTrend(draws, type, window, 5);
+    const sumStats = calculateSumStats(draws, type, 50);
 
-    return NextResponse.json({
+    const payload = {
       data: {
         lotteryType: type,
         lotteryName: LOTTERY_RULES[type].nameVi,
@@ -51,13 +62,18 @@ export async function GET(request: NextRequest) {
         pairs: pairMatrix.pairs,
         maxPairCount: pairMatrix.maxCount,
         trend: { hot: trend.hot, cold: trend.cold },
+        sumStats,
       },
       meta: {
         maxNumbers: LOTTERY_RULES[type].maxNumber,
         pairCount: pairMatrix.pairs.length,
         drawsAnalyzed: pairMatrix.drawsAnalyzed,
       },
-    });
+    };
+
+    cacheSet(cacheKey, payload);
+
+    return NextResponse.json(payload);
   } catch (error) {
     console.error("Error computing stats:", error);
     return NextResponse.json(

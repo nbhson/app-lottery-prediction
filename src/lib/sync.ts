@@ -352,7 +352,11 @@ export function startAutoSync(): { stop: () => void } {
   void syncAll().catch(() => {});
 
   const timer = setInterval(() => {
-    void syncAll();
+    // Ghi log lỗi thay vì nuốt im lặng — sync log đã ghi trạng thái FAILED
+    // nhưng lỗi có thể xảy ra trước khi startSyncLog chạy
+    syncAll().catch((error) => {
+      console.error("[sync] Scheduled sync failed:", error);
+    });
   }, intervalMs);
 
   // Không giữ event loop nếu app tắt

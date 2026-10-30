@@ -1127,6 +1127,37 @@ a { color: var(--color-primary); }
   font-weight: 600;
 }
 
+/* ── 26b. Line chart tổng bộ số (/stats) ─────────────────── */
+.chart-line {
+  stroke: var(--color-primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-point circle {
+  fill: var(--color-primary);
+  stroke: var(--color-surface);
+  stroke-width: 1.5;
+  transition: r var(--transition-fast);
+}
+
+.chart-point circle[data-tone="even"] {
+  fill: var(--color-success);
+}
+
+.chart-point circle[data-tone="odd"] {
+  fill: var(--color-danger);
+}
+
+.chart-point:hover circle {
+  r: 6;
+}
+
+.chart-point:hover .chart-tooltip {
+  opacity: 1;
+}
+
 /* ── 27. Heatmap cặp số (/stats) ──────────────────────────── */
 .heatmap-scroll {
   overflow-x: auto;
