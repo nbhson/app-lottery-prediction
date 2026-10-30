@@ -3,7 +3,7 @@
 [![CI](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> Ứng dụng web chuẩn enterprise: **tự động đồng bộ kết quả Vietlott THẬT** từ website chính thức, dự đoán kết hợp **thống kê + model AI** (cấu hình qua `.env`).
+> Ứng dụng web chuẩn enterprise: **tự động đồng bộ kết quả Vietlott THẬT** từ website chính thức, dự đoán kết hợp **thống kê + model AI** (cấu hình qua `.env`), **tự chấm điểm độ chính xác dự đoán** (accuracy tracking) và **audit chất lượng dữ liệu** (data quality audit).
 
 ⚠️ **Cảnh báo:** Dự đoán KHÔNG đảm bảo trúng. Xổ số là ngẫu nhiên hoàn toàn. 18+, chơi có trách nhiệm.
 
@@ -34,29 +34,69 @@
 |---|---|
 | `/` | Kết quả mới nhất (dữ liệu thật) + nút đồng bộ thủ công |
 | `/history` | Lịch sử kết quả, phân trang |
-| `/prediction` | Dự đoán thống kê (tần suất / gap / kết hợp) |
+| `/prediction` | Dự đoán thống kê (tần suất / gap / kết hợp) + **độ chính xác dự đoán** |
 | `/prediction/ai` | Dự đoán AI + thống kê kết hợp, có số yêu thích |
+| `/stats` | Thống kê nâng cao: tần suất đầy đủ, heatmap cặp số, xu hướng nóng/lạnh |
 | `/about` | Cảnh báo rủi ro, điều khoản |
 
 ## API
 
 | Endpoint | Mô tả |
 |---|---|
-| `POST /api/sync?type=MEGA_645` | Đồng bộ 1 loại hình từ vietlott.vn |
+| `POST /api/sync?type=MEGA_645` | Đồng bộ 1 loại hình từ vietlott.vn (yêu cầu `SYNC_API_TOKEN` nếu cấu hình) |
 | `POST /api/sync` | Đồng bộ tất cả |
-| `GET /api/sync` | Xem sync logs |
+| `GET /api/sync` | Xem sync logs + cờ `syncApiProtected` |
 | `GET /api/draws/latest?type=...` | Kết quả mới nhất |
 | `GET /api/draws/history?type=&limit=&offset=` | Lịch sử có phân trang |
 | `GET /api/ai-prediction?type=&favorites=3,14` | Dự đoán AI + thống kê |
+| `GET /api/accuracy?type=` | **Độ chính xác dự đoán**: đã chấm, TB số trúng, baseline random, lift, phân phối |
+| `GET /api/health` | **Health check**: DB, đếm records, data quality, trạng thái sync + AI (cho monitoring) |
 | `GET /api/status` | Trạng thái nguồn + AI (không lộ API key) |
+
+## Accuracy Tracking — tự chấm điểm dự đoán
+
+Mỗi lần dự đoán (thống kê hoặc AI) được ghi vào bảng `prediction_log`. Khi kỳ
+kết quả mới được đồng bộ, hệ thống **tự động chấm điểm** các dự đoán đang chờ:
+
+- `avgMatches` — trung bình số trúng/kỳ của các dự đoán đã chấm
+- `baseline` — kỳ vọng nếu chọn ngẫu nhiên hoàn toàn (6²/45 ≈ 0.8 cho Mega 6/45)
+- `lift` — avgMatches / baseline. **Lift ≈ 1 nghĩa là phương pháp không nhỉnh hơn
+  random** — trung thực với bản chất xác suất của xổ số, không tạo ảo giác.
+- Retention tự động: chỉ giữ 5000 bản ghi mới nhất.
+
+Chấm điểm chỉ áp dụng cho dự đoán được tạo TRƯỚC ngày của kỳ mới (invariant
+`after_draw_date < draw_date`) — backfill các kỳ cũ không gây chấm nhầm.
+
+## Data Quality Audit
+
+`GET /api/health` chạy audit read-only cho từng loại hình:
+
+- draw_number / draw_date trùng lặp
+- Bộ số sai (sai số lượng, ngoài phạm vi 1-45/1-55, trùng nhau trong kỳ)
+- Đứt chuỗi draw ID (dấu hiệu backfill thiếu kỳ)
+
+Status: `OK` → `WARN` (đứt chuỗi) → `DEGRADED` (dữ liệu sai). Health endpoint
+trả 503 khi DB không truy cập được — sẵn sàng cắm vào monitoring/load balancer.
+
+## Bảo mật API sync
+
+Đặt `SYNC_API_TOKEN` trong `.env` để bảo vệ `POST /api/sync`:
+
+```env
+SYNC_API_TOKEN=<chuỗi ngẫu nhiên dài>
+```
+
+Request phải kèm header `x-api-token: <token>` hoặc `Authorization: Bearer <token>`
+(so sánh timing-safe, tránh timing attack). Kiểm tra auth chạy **trước** rate-limit —
+kẻ lạ không thể đốt trần tổng. Chưa cấu hình token → sync mở (chỉ dùng cho dev).
 
 ## Cài đặt
 
 ```bash
 npm install
-cp .env.example .env   # cấu hình AI (tùy chọn) + data source
+cp .env.example .env   # cấu hình AI (tùy chọn) + data source + SYNC_API_TOKEN (khuyến nghị)
 npm run dev            # → http://localhost:3000 (auto-sync + backfill tự chạy lúc start)
-npm test               # 50 unit + integration tests (chạy qua tsx)
+npm test               # 66 unit + integration tests (chạy qua tsx)
 ```
 
 ### Cấu hình `.env`
@@ -76,6 +116,7 @@ FETCH_MAX_RETRIES=3
 # Deployment (tùy chọn)
 # DATA_DIR=/var/lib/vietlott  # thư mục SQLite, mặc định <project>/data
 # TRUST_PROXY=1               # bật khi chạy sau reverse proxy đáng tin (nginx/Vercel)
+# SYNC_API_TOKEN=<token>      # bảo vệ POST /api/sync khi deploy public
 ```
 
 **Lưu ý:** Vietlott chặn IP ngoài Việt Nam — nếu chạy từ nước ngoài cần đặt server tại VN hoặc dùng proxy. Nguồn dữ liệu chính thức: `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645` (đã xác minh trả dữ liệu thật). Lần chạy đầu app tự backfill ~120 kỳ/loại hình (~2-3 phút, chạy nền).
@@ -99,7 +140,7 @@ FETCH_MAX_RETRIES=3
 ## Kiểm thử
 
 ```bash
-npm test                                   # 50 unit + integration tests (tsx --test)
+npm test                                   # 66 unit + integration tests (tsx --test)
 npm run build                              # production build
 ```
 

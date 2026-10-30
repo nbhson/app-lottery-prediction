@@ -15,6 +15,7 @@ export async function GET() {
         ...getSyncStatus(),
         ai: getAIConfig(),
         dataSourceConfigured: getConfig().dataSource.source,
+        syncApiProtected: Boolean(process.env.SYNC_API_TOKEN?.trim()),
       },
     });
   } catch (error) {

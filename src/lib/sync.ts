@@ -30,6 +30,7 @@ import {
   finishSyncLog,
   getSyncLogs,
 } from "@/lib/db";
+import { gradePredictionsForNewDraw } from "@/lib/accuracy";
 import { LotteryType } from "@/types/lottery";
 
 /** Kết quả một lần sync */
@@ -147,6 +148,12 @@ export async function syncLotteryType(
       published: draw.published,
     });
 
+    // Accuracy tracking: kỳ MỚI được chèn → chấm các dự đoán đang chờ
+    // (backfill các kỳ cũ có after_draw_date >= drawDate nên không bị chấm nhầm)
+    if (inserted) {
+      gradePredictionsForNewDraw(lotteryType, draw);
+    }
+
     setSyncStatus({
       connected: true,
       source: "vietlott.vn (EN)",
@@ -227,8 +234,6 @@ export async function backfillHistory(
       });
       return -1;
     }
-    inserted += insertDrawsMany(history.draws);
-
     inserted += insertDrawsMany(history.draws);
 
     // Bước 2: chain ajaxpro — scrape lần lượt kỳ trước đó từ kỳ cũ nhất trong DB

@@ -1,9 +1,14 @@
 /**
  * API đồng bộ dữ liệu — kích hoạt fetch từ nguồn Vietlott thật
- * GET  ?type=MEGA_645 → sync 1 loại hình
- * POST (không body)   → sync tất cả
+ * GET  → xem trạng thái + sync logs
+ * POST → sync tất cả (hoặc 1 loại hình qua ?type=)
+ *
+ * Bảo mật enterprise: nếu cấu hình SYNC_API_TOKEN trong .env, mọi request POST
+ * phải kèm header `x-api-token` hoặc `Authorization: Bearer <token>` (so sánh
+ * timing-safe). Không cấu hình → mở (dev/single-user, rate limit vẫn bảo vệ).
  */
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { syncLotteryType, syncAll, getLastSyncError } from "@/lib/sync";
 import { getSyncLogs, getSyncStatus } from "@/lib/db";
 import { LotteryType } from "@/types/lottery";
@@ -14,8 +19,39 @@ export const dynamic = "force-dynamic"; // luôn chạy realtime, không cache
 /** Per-IP 5 lần/phút + trần tổng 10 lần/phút (mỗi lần kích hoạt scrape nguồn Vietlott). */
 const SYNC_RATE_LIMIT = { limit: 5, windowMs: 60_000, globalLimit: 10 };
 
+/** So sánh chuỗi secret timing-safe để tránh timing attack */
+function safeEquals(a: string, b: string): boolean {
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+/**
+ * Kiểm tra quyền kích hoạt sync.
+ * SYNC_API_TOKEN chưa cấu hình → cho phép (chế độ dev).
+ */
+function isSyncAuthorized(request: NextRequest): boolean {
+  const expected = process.env.SYNC_API_TOKEN?.trim() ?? "";
+  if (!expected) return true;
+
+  const headerToken =
+    request.headers.get("x-api-token") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    "";
+  return headerToken.length > 0 && safeEquals(headerToken, expected);
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // Auth TRƯỚC rate-limit — kẻ lạ không được đốt trần tổng của route
+    if (!isSyncAuthorized(request)) {
+      return NextResponse.json(
+        { error: "Không có quyền đồng bộ. Cần token hợp lệ." },
+        { status: 401 }
+      );
+    }
+
     const rl = checkRateLimit(
       "sync",
       request.headers,
@@ -68,6 +104,7 @@ export async function GET() {
       status: getSyncStatus(),
       lastError: getLastSyncError(),
       recentLogs: getSyncLogs(10),
+      syncApiProtected: Boolean(process.env.SYNC_API_TOKEN?.trim()),
     });
   } catch (error) {
     console.error("[api/sync] Lỗi khi đọc sync log:", error);

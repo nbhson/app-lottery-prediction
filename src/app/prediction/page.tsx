@@ -9,6 +9,18 @@ import { useState, useEffect } from "react";
 import { LOTTERY_RULES, LotteryType, Prediction, FrequencyStats } from "@/types/lottery";
 import LotteryBall from "@/components/LotteryBall";
 
+/** Response shape của GET /api/accuracy */
+interface AccuracyStats {
+  totalLogged: number;
+  totalGraded: number;
+  totalPending: number;
+  avgMatches: number | null;
+  baseline: number;
+  lift: number | null;
+  distribution: Array<{ matches: number; count: number }>;
+  bestMatches: number | null;
+}
+
 const METHOD_LABELS: Record<string, string> = {
   FREQUENCY: "Tần suất (số hay ra)",
   GAP: "Khoảng trống (số lâu chưa ra)",
@@ -36,6 +48,7 @@ export default function PredictionPage() {
   const [coldNumbers, setColdNumbers] = useState<FrequencyStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [accuracy, setAccuracy] = useState<AccuracyStats | null>(null);
 
   const fetchPrediction = async (type: LotteryType, m: string) => {
     setSelectedType(type);
@@ -57,6 +70,15 @@ export default function PredictionPage() {
       setError("Lỗi kết nối server. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+
+    // Accuracy stats — lỗi thì im lặng (không quan trọng bằng dự đoán chính)
+    try {
+      const res = await fetch(`/api/accuracy?type=${type}`);
+      const json = await res.json();
+      setAccuracy(json.data ?? null);
+    } catch {
+      setAccuracy(null);
     }
   };
 
@@ -207,6 +229,67 @@ export default function PredictionPage() {
               </ul>
             </section>
           </div>
+
+          {/* Độ chính xác dự đoán — accuracy tracking */}
+          <section className="card" aria-label="Độ chính xác dự đoán">
+            <h2 style={{ marginBottom: "var(--space-4)" }}>
+              📏 Độ chính xác dự đoán (tự động chấm khi có kỳ mới)
+            </h2>
+            {accuracy && accuracy.totalLogged > 0 ? (
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "var(--space-6)",
+                    flexWrap: "wrap",
+                    marginBottom: "var(--space-4)",
+                  }}
+                >
+                  <div>
+                    <div className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
+                      Đã chấm / Tổng log
+                    </div>
+                    <strong>
+                      {accuracy.totalGraded} / {accuracy.totalLogged}
+                    </strong>
+                    {accuracy.totalPending > 0 && (
+                      <span className="text-muted"> ({accuracy.totalPending} chờ kỳ mới)</span>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
+                      TB số trúng/kỳ
+                    </div>
+                    <strong>{accuracy.avgMatches ?? "—"}</strong>
+                  </div>
+                  <div>
+                    <div className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
+                      Kỳ vọng ngẫu nhiên
+                    </div>
+                    <strong>{accuracy.baseline}</strong>
+                  </div>
+                  <div>
+                    <div className="text-muted" style={{ fontSize: "var(--text-xs)" }}>
+                      Lift (TB / random)
+                    </div>
+                    <strong>{accuracy.lift ?? "—"}</strong>
+                  </div>
+                </div>
+                <p
+                  className="text-muted"
+                  style={{ fontSize: "var(--text-xs)", margin: 0 }}
+                >
+                  Lift ≈ 1 nghĩa là phương pháp <strong>không nhỉnh hơn chọn ngẫu nhiên</strong> —
+                  đúng bản chất xác suất của xổ số. Lift chỉ là quan sát quá khứ, không dự báo tương lai.
+                </p>
+              </div>
+            ) : (
+              <p className="text-muted" style={{ margin: 0 }}>
+                Chưa có dữ liệu độ chính xác — hệ thống tự ghi log mỗi lần dự đoán và chấm
+                điểm khi kỳ kết quả mới được đồng bộ. Quay lại sau vài kỳ để xem xu hướng.
+              </p>
+            )}
+          </section>
         </>
       ) : (
         <div className="card text-center">

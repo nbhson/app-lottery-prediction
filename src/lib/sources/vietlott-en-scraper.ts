@@ -216,34 +216,6 @@ export function parsePower655(html: string): ScrapeResult {
 }
 
 /**
- * Thử scraper trang HTML trước
- */
-async function scrapeFromPage(
-  url: string,
-  lotteryType: LotteryType
-): Promise<ScrapeResult> {
-  const { ok, body, status } = await fetchWithRetry(url);
-  if (!ok) return { success: false, error: `HTTP ${status}: Không truy cập được` };
-
-  // Kiểm tra page hợp lệ
-  if (
-    body.length < 1000 ||
-    body.includes("captcha") ||
-    body.includes("401 Authorization")
-  )
-    return { success: false, error: `Trang bị chặn (${body.length} bytes)` };
-
-  if (!body.includes("Draw ID"))
-    return {
-      success: false,
-      error: "Trang không chứa kết quả — cấu trúc có thể đã thay đổi",
-    };
-
-  const parser = lotteryType === "MEGA_645" ? parseMega645 : parsePower655;
-  return parser(body);
-}
-
-/**
  * Scrape kết quả mới nhất từ trang chi tiết (1 kỳ)
  */
 export async function scrapeLatest(

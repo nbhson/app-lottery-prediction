@@ -127,6 +127,51 @@ handlers TRỰC TIẾP với `NextRequest` thật (không cần server):
 
 **Kết quả: 42/42 tests pass (15 + 12 + 5 + 10) · tsc 0 · lint sạch · build OK**
 
+## Cập nhật 30/10/2026 (vòng 6) — nâng cấp nghiệp vụ enterprise
+
+**Fix bugs từ audit code:**
+- `sync.ts`: xóa dòng `insertDrawsMany(history.draws)` gọi 2 lần (vô hại do
+  `INSERT OR IGNORE` nhưng thừa, sai ý đồ)
+- `vietlott-en-scraper.ts`: xóa dead code `scrapeFromPage()` (duplicate logic
+  của `scrapeLatest`)
+- `prediction.ts`: thêm tie-break theo số tăng dần cho cả 3 phương pháp dự đoán
+  → kết quả deterministic khi tần suất/gap/điểm bằng nhau
+- Thêm file `LICENSE` (MIT) — README badge đã trỏ tới từ trước nhưng thiếu file
+
+**Accuracy Tracking — tự chấm điểm dự đoán (nghiệp vụ mới):**
+- Bảng `prediction_log` mới trong SQLite: ghi mỗi lần dự đoán (method, numbers,
+  confidence, mốc `after_draw_number/date`)
+- `src/lib/accuracy.ts`: `countMatches` (khử trùng lặp), `randomBaseline`
+  (pickCount²/totalNumbers), `gradePredictionsForNewDraw` (chấm tự động khi kỳ
+  mới được sync — invariant `after_draw_date < draw_date` để backfill không
+  chấm nhầm), `getAccuracyStats` (SQL aggregate: avgMatches, baseline, lift,
+  phân phối, best)
+- Sync gọi chấm điểm sau khi chèn kỳ mới thành công; retention giữ 5000 rows
+- `GET /api/accuracy?type=` + section "Độ chính xác dự đoán" trên trang /prediction
+- Triết lý trung thực: lift ≈ 1 → không nhỉnh hơn random, hiển thị rõ cho người dùng
+
+**Bảo mật API sync:**
+- `SYNC_API_TOKEN` (.env) bảo vệ `POST /api/sync`: header `x-api-token` hoặc
+  `Authorization: Bearer`, so sánh `crypto.timingSafeEqual`
+- Auth chạy TRƯỚC rate-limit — kẻ lạ không đốt được trần tổng
+- `/api/status` + `GET /api/sync` thêm cờ `syncApiProtected`
+
+**Health & Data Quality:**
+- `src/lib/data-quality.ts` (mới): audit read-only — draw_number/date trùng,
+  bộ số sai, đứt chuỗi draw ID (vd kỳ MXSH-00500 thiếu giữa chuỗi) → status
+  OK/WARN/DEGRADED
+- `GET /api/health` (mới): DB liveness (503 khi chết), draw counts, quality
+  audit, sync status, AI enabled — sẵn sàng cho monitoring/load balancer
+
+**Kiểm chứng:**
+
+```
+npm test  →  66/66 pass (thêm 16 tests: accuracy pure + health + auth + accuracy API)
+tsc       →  0 errors
+lint      →  No ESLint warnings or errors
+build     →  16 routes compile sạch (thêm /api/accuracy, /api/health)
+```
+
 ## Trạng thái: ✅ BACKLOG ĐÃ XỬ LÝ HẾT — chuyển sang chế độ bảo trì
 
 ## Việc tiếp theo (backlog)

@@ -79,8 +79,10 @@ export function predictByFrequency(
   const rule = LOTTERY_RULES[lotteryType];
   const stats = calculateFrequencyStats(draws, lotteryType);
 
-  // Sắp xếp theo tần suất giảm dần
-  const sorted = [...stats].sort((a, b) => b.count - a.count);
+  // Sắp xếp theo tần suất giảm dần — tie-break theo số tăng dần để kết quả deterministic
+  const sorted = [...stats].sort(
+    (a, b) => b.count - a.count || a.number - b.number
+  );
 
   // Trọng số: tần suất chuẩn hóa → điểm
   const maxCount = sorted[0]?.count ?? 1;
@@ -124,8 +126,10 @@ export function predictByGap(
   const rule = LOTTERY_RULES[lotteryType];
   const stats = calculateFrequencyStats(draws, lotteryType);
 
-  // Sắp xếp theo gap giảm dần (số lâu chưa ra nhất)
-  const sorted = [...stats].sort((a, b) => b.gap - a.gap);
+  // Sắp xếp theo gap giảm dần (số lâu chưa ra nhất) — tie-break theo số tăng dần
+  const sorted = [...stats].sort(
+    (a, b) => b.gap - a.gap || a.number - b.number
+  );
   const topGaps = sorted.slice(0, topN ?? rule.pickCount);
 
   // Độ tin cậy TƯƠNG ĐỐI (0–40): gap càng lớn so với cửa sổ dữ liệu,
@@ -166,9 +170,9 @@ export function predictByFrequencyAndGap(
     score: (s.count / maxCount) * 0.5 + (s.gap / maxGap) * 0.5,
   }));
 
-  // Chọn top N theo điểm
+  // Chọn top N theo điểm — tie-break theo số tăng dần để kết quả deterministic
   const topNumbers = scored
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score || a.number - b.number)
     .slice(0, topN ?? rule.pickCount);
 
   // Điểm tin cậy TƯƠNG ĐỐI (0–45): trung bình tín hiệu tần suất + gap,

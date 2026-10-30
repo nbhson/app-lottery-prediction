@@ -5,7 +5,7 @@ import {
   predictByFrequencyAndGap,
   getHotAndColdNumbers,
 } from "@/lib/prediction";
-import { getDrawHistory } from "@/lib/db";
+import { getDrawHistory, insertPredictionLog } from "@/lib/db";
 import { Prediction, LOTTERY_RULES } from "@/types/lottery";
 import { parseLotteryTypeParam } from "@/lib/validate";
 
@@ -52,6 +52,19 @@ export async function GET(request: NextRequest) {
     // Đảm bảo số lượng đúng quy tắc
     const rule = LOTTERY_RULES[type];
     const finalNumbers = prediction.numbers.slice(0, rule.pickCount);
+
+    // Accuracy tracking: ghi log dự đoán (chờ kỳ mới để chấm điểm).
+    // insertPredictionLog không bao giờ throw — lỗi log không ảnh hưởng response.
+    if (draws[0]) {
+      insertPredictionLog({
+        lotteryType: type,
+        method: prediction.method,
+        numbers: finalNumbers,
+        confidence: prediction.confidence,
+        afterDrawNumber: draws[0].drawNumber,
+        afterDrawDate: draws[0].drawDate,
+      });
+    }
 
     // Lấy thêm số nóng/lạnh
     const hotCold = getHotAndColdNumbers(type, 10);

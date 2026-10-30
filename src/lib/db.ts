@@ -129,11 +129,30 @@ function initSchema(): void {
       error_message TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS prediction_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      lottery_type TEXT NOT NULL CHECK(lottery_type IN ('MEGA_645', 'POWER_655')),
+      method TEXT NOT NULL,
+      numbers TEXT NOT NULL,
+      confidence INTEGER,
+      after_draw_number TEXT NOT NULL,
+      after_draw_date TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now', '+7 hours')),
+      graded_draw_number TEXT,
+      graded_draw_date TEXT,
+      matches INTEGER,
+      matched_numbers TEXT,
+      graded_at TEXT
+    );
+
     CREATE INDEX IF NOT EXISTS idx_draws_type_date
       ON draws(lottery_type, draw_date DESC);
 
     CREATE INDEX IF NOT EXISTS idx_sync_log_started
       ON sync_log(started_at DESC);
+
+    CREATE INDEX IF NOT EXISTS idx_predlog_type_graded
+      ON prediction_log(lottery_type, graded_at);
   `);
 
   // Đảm bảo bản ghi trạng thái nguồn dữ liệu tồn tại (không seed dữ liệu draws)
@@ -506,6 +525,175 @@ export function getSyncLogs(limit: number = 20): SyncLogEntry[] {
     recordsAdded: row.records_added,
     errorMessage: row.error_message,
   }));
+}
+
+// ============================================================
+// Prediction log — theo dõi độ chính xác dự đoán (accuracy tracking)
+// ============================================================
+
+/** Tham số ghi 1 lần dự đoán vào prediction_log */
+export interface PredictionLogParams {
+  lotteryType: LotteryType;
+  method: string;
+  numbers: number[];
+  confidence: number;
+  /** Số kỳ mới nhất trong DB tại lúc dự đoán — dùng làm mốc chấm điểm */
+  afterDrawNumber: string;
+  afterDrawDate: string;
+}
+
+/**
+ * Ghi 1 lần dự đoán vào prediction_log (chưa chấm — chờ kỳ mới để grade).
+ * KHÔNG bao giờ throw — logging phải không bao giờ làm hỏng response chính.
+ */
+export function insertPredictionLog(params: PredictionLogParams): void {
+  try {
+    getDb()
+      .prepare(
+        `
+      INSERT INTO prediction_log
+        (lottery_type, method, numbers, confidence, after_draw_number, after_draw_date)
+      VALUES
+        (@lotteryType, @method, @numbers, @confidence, @afterDrawNumber, @afterDrawDate)
+    `
+      )
+      .run({
+        lotteryType: params.lotteryType,
+        method: params.method,
+        numbers: JSON.stringify(params.numbers),
+        confidence: Math.round(params.confidence),
+        afterDrawNumber: params.afterDrawNumber,
+        afterDrawDate: params.afterDrawDate,
+      });
+  } catch (error) {
+    console.error("[db] insertPredictionLog thất bại (bỏ qua):", error);
+  }
+}
+
+/** Bản ghi prediction_log chưa chấm điểm (kết quả truy vấn) */
+export interface PendingPredictionRow {
+  id: number;
+  lottery_type: LotteryType;
+  method: string;
+  numbers: string;
+  confidence: number;
+  after_draw_number: string;
+  after_draw_date: string;
+}
+
+/**
+ * Lấy các dự đoán chưa chấm điểm của 1 loại hình, tạo TRƯỚC kỳ `drawDate`.
+ * Bất biến: chỉ chấm dự đoán được tạo trước ngày kỳ mới — backfill các kỳ cũ
+ * (drawDate < after_draw_date) sẽ không kích hoạt chấm nhầm.
+ */
+export function getUngradedPredictions(
+  lotteryType: LotteryType,
+  newDrawDate: string,
+  limit: number = 2000
+): PendingPredictionRow[] {
+  return getDb()
+    .prepare(
+      `
+    SELECT id, lottery_type, method, numbers, confidence,
+           after_draw_number, after_draw_date
+    FROM prediction_log
+    WHERE lottery_type = ?
+      AND graded_at IS NULL
+      AND after_draw_date < ?
+    ORDER BY id ASC
+    LIMIT ?
+  `
+    )
+    .all(lotteryType, newDrawDate, limit) as PendingPredictionRow[];
+}
+
+/** Tham số chấm điểm 1 bản ghi dự đoán */
+export interface GradePredictionParams {
+  id: number;
+  gradedDrawNumber: string;
+  gradedDrawDate: string;
+  matches: number;
+  matchedNumbers: number[];
+}
+
+/** Chấm điểm 1 bản ghi — ghi kỳ thực tế + số lượng/kNhững số trúng */
+export function gradePredictionLog(params: GradePredictionParams): void {
+  getDb()
+    .prepare(
+      `
+    UPDATE prediction_log
+    SET graded_draw_number = @gradedDrawNumber,
+        graded_draw_date = @gradedDrawDate,
+        matches = @matches,
+        matched_numbers = @matchedNumbers,
+        graded_at = datetime('now', '+7 hours')
+    WHERE id = @id
+  `
+    )
+    .run({
+      id: params.id,
+      gradedDrawNumber: params.gradedDrawNumber,
+      gradedDrawDate: params.gradedDrawDate,
+      matches: params.matches,
+      matchedNumbers: JSON.stringify(params.matchedNumbers),
+    });
+}
+
+/** Giữ tối đa `keep` bản ghi mới nhất — chạy sau khi chấm để bảng không phình vô hạn */
+export function prunePredictionLog(keep: number = 5000): void {
+  getDb()
+    .prepare(
+      `
+    DELETE FROM prediction_log
+    WHERE id NOT IN (SELECT id FROM prediction_log ORDER BY id DESC LIMIT ?)
+  `
+    )
+    .run(keep);
+}
+
+/** Row tổng hợp accuracy từ SQL */
+export interface AccuracyAggregateRow {
+  total: number;
+  graded: number;
+  pending: number | null;
+  avg_matches: number | null;
+  best: number | null;
+}
+
+/** Aggregate tổng hợp cho getAccuracyStats (lib/accuracy.ts) */
+export function getAccuracyAggregate(
+  lotteryType: LotteryType
+): AccuracyAggregateRow {
+  return getDb()
+    .prepare(
+      `
+    SELECT COUNT(*) AS total,
+           COUNT(matches) AS graded,
+           SUM(CASE WHEN graded_at IS NULL THEN 1 ELSE 0 END) AS pending,
+           AVG(matches) AS avg_matches,
+           MAX(matches) AS best
+    FROM prediction_log
+    WHERE lottery_type = ?
+  `
+    )
+    .get(lotteryType) as AccuracyAggregateRow;
+}
+
+/** Phân phối số trúng: [{matches, c}] — chỉ các matches đã chấm */
+export function getAccuracyDistribution(
+  lotteryType: LotteryType
+): Array<{ matches: number; c: number }> {
+  return getDb()
+    .prepare(
+      `
+    SELECT matches, COUNT(*) AS c
+    FROM prediction_log
+    WHERE lottery_type = ? AND matches IS NOT NULL
+    GROUP BY matches
+    ORDER BY matches ASC
+  `
+    )
+    .all(lotteryType) as Array<{ matches: number; c: number }>;
 }
 
 // ============================================================

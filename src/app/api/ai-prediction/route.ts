@@ -7,6 +7,7 @@ import { predictWithAI } from "@/lib/ai/prediction";
 import { LOTTERY_RULES } from "@/types/lottery";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { parseLotteryTypeParam } from "@/lib/validate";
+import { insertPredictionLog } from "@/lib/db";
 
 export const dynamic = "force-dynamic"; // AI prediction không cache
 
@@ -48,6 +49,31 @@ export async function GET(request: NextRequest) {
       .filter((n) => Number.isInteger(n) && n > 0);
 
     const result = await predictWithAI(type, { historyLimit, favoriteNumbers });
+
+    // Accuracy tracking: ghi log cả dự đoán thống kê lẫn AI (nếu có).
+    // KHÔNG bao giờ làm hỏng response chính — insertPredictionLog nuốt error nội bộ.
+    // Lưu ý: recentDraws sắp xếp cũ → mới (getDrawsForAI) — kỳ mới nhất là phần tử CUỐI.
+    const newestDraw = result.recentDraws[result.recentDraws.length - 1];
+    if (newestDraw) {
+      insertPredictionLog({
+        lotteryType: type,
+        method: result.statistical.method,
+        numbers: result.statistical.numbers,
+        confidence: result.statistical.confidence,
+        afterDrawNumber: newestDraw.drawNumber,
+        afterDrawDate: newestDraw.drawDate,
+      });
+      if (result.ai && result.ai.numbers.length > 0) {
+        insertPredictionLog({
+          lotteryType: type,
+          method: "AI",
+          numbers: result.ai.numbers,
+          confidence: result.statistical.confidence, // AI không có confidence riêng — dùng trần thống kê
+          afterDrawNumber: newestDraw.drawNumber,
+          afterDrawDate: newestDraw.drawDate,
+        });
+      }
+    }
 
     return NextResponse.json({
       data: result,
