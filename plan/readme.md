@@ -172,6 +172,38 @@ lint      →  No ESLint warnings or errors
 build     →  16 routes compile sạch (thêm /api/accuracy, /api/health)
 ```
 
+## Cập nhật 30/10/2026 (vòng 7) — nâng cấp Next.js 14 → 16, vá toàn bộ lỗ hổng
+
+**Động cơ:** `npm audit` báo 5 lỗ hổng (1 critical Next.js — DoS Image Optimizer,
+request smuggling rewrites, RSC deserialization; 4 high postcss/glob). Các advisory
+ảnh hưởng cả dải tới 16.3-preview → không có bản vá trong nhánh 14, phải nâng cấp major.
+
+**Thay đổi:**
+- `next` ^14.2 → **^16.4.3**, `react`/`react-dom` ^18.3 → **^19.3.1** (bắt buộc Next 15+)
+- `@types/react(-dom)` → ^19; `eslint` ^8.57 → **^9.39**, `eslint-config-next` → ^16.4.3
+- **Next 16 xóa `next lint`** → ESLint 9 flat config `eslint.config.mjs`
+  (eslint-config-next 16 export flat config gốc — không cần FlatCompat), script
+  `lint` = `eslint .`; xóa `.eslintrc.json`
+- **Turbopack mặc định cho dev + build** → `next.config.mjs` bỏ hẳn webpack config:
+  - `experimental.serverComponentsExternalPackages` → `serverExternalPackages` (stable Next 15)
+  - alias `@` đọc tự động từ `tsconfig.json paths` — không cần webpack alias
+- ESLint 9 / react-hooks mới bắt 12 issue: sửa tận gốc `<a href="/">` → `<Link>`
+  (history, stats), xóa 4 disable directive `exhaustive-deps` thừa, fix 8 lỗi
+  `react-hooks/set-state-in-effect` bằng `queueMicrotask()` (tránh cascading
+  render khi fetch-on-mount)
+- CI: Node 20 (đã EOL) → 22
+
+**Kiểm chứng:**
+
+```
+npm audit → 0 vulnerabilities (từ 5: 1 critical + 4 high)
+npm test  →  66/66 pass
+tsc       →  0 errors
+eslint .  →  0 errors, 0 warnings
+build     →  17 routes (Turbopack) — 1 warning vô hại về process.once trong
+             instrumentation.ts (đã guard NEXT_RUNTIME=nodejs, chỉ runtime Node chạy)
+```
+
 ## Trạng thái: ✅ BACKLOG ĐÃ XỬ LÝ HẾT — chuyển sang chế độ bảo trì
 
 ## Việc tiếp theo (backlog)

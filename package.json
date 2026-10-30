@@ -7,21 +7,21 @@
     "build": "next build",
     "start": "next start",
     "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts tests/accuracy.test.ts tests/api-routes.test.ts",
-    "lint": "next lint"
+    "lint": "eslint ."
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
-    "next": "^14.2.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "next": "^16.4.3",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^20.0.0",
-    "@types/react": "^18.3.0",
-    "@types/react-dom": "^18.3.0",
-    "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.35",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.4.3",
     "tsx": "^4.23.15",
     "typescript": "^5.0.0"
   }

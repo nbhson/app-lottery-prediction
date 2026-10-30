@@ -8,6 +8,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { LOTTERY_RULES, LotteryType, FrequencyStats } from "@/types/lottery";
 import WarningBanner from "@/components/WarningBanner";
 import TypeSelector from "@/components/TypeSelector";
@@ -67,8 +68,9 @@ export default function StatsPage() {
 
   // Load mặc định khi mount
   useEffect(() => {
-    fetchStats("MEGA_645", 20);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    queueMicrotask(() => {
+      fetchStats("MEGA_645", 20);
+    });
   }, []);
 
   const rule = stats ? LOTTERY_RULES[stats.lotteryType] : LOTTERY_RULES[selectedType];
@@ -219,7 +221,7 @@ export default function StatsPage() {
             Chưa có dữ liệu để thống kê — hãy đồng bộ từ trang chủ.
           </p>
           <p style={{ marginTop: "var(--space-3)" }}>
-            <a href="/" className="btn">🔄 Về trang chủ để đồng bộ</a>
+            <Link href="/" className="btn">🔄 Về trang chủ để đồng bộ</Link>
           </p>
         </div>
       )}

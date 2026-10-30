@@ -4,6 +4,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { LotteryType, DrawResult } from "@/types/lottery";
 import DrawTable from "@/components/DrawTable";
 import Pagination from "@/components/Pagination";
@@ -44,8 +45,9 @@ export default function HistoryPage() {
 
   // Load mặc định khi mount
   useEffect(() => {
-    fetchHistory("MEGA_645");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    queueMicrotask(() => {
+      fetchHistory("MEGA_645");
+    });
   }, []);
 
   return (
@@ -94,7 +96,7 @@ export default function HistoryPage() {
         <div className="card text-center">
           <p className="text-muted">Chưa có dữ liệu lịch sử.</p>
           <p style={{ marginTop: "var(--space-3)" }}>
-            <a href="/" className="btn">🔄 Về trang chủ để đồng bộ</a>
+            <Link href="/" className="btn">🔄 Về trang chủ để đồng bộ</Link>
           </p>
         </div>
       )}

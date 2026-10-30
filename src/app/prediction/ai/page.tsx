@@ -63,8 +63,9 @@ export default function AIPredictionPage() {
 
   // Load mặc định khi mount
   useEffect(() => {
-    fetchPrediction("MEGA_645");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    queueMicrotask(() => {
+      fetchPrediction("MEGA_645");
+    });
   }, []);
 
   return (

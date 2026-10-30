@@ -84,8 +84,9 @@ export default function PredictionPage() {
 
   // Load mặc định khi mount
   useEffect(() => {
-    fetchPrediction("MEGA_645", "FREQUENCY_AND_GAP");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    queueMicrotask(() => {
+      fetchPrediction("MEGA_645", "FREQUENCY_AND_GAP");
+    });
   }, []);
 
   const maxHotCount = Math.max(...hotNumbers.slice(0, 5).map((s) => s.count), 1);

@@ -141,8 +141,16 @@ FETCH_MAX_RETRIES=3
 
 ```bash
 npm test                                   # 66 unit + integration tests (tsx --test)
-npm run build                              # production build
+npm run lint                               # ESLint 9 (flat config — Next 16 đã xóa `next lint`)
+npm run build                              # production build (Turbopack)
 ```
+
+## Stack
+
+- **Next.js 16** (App Router, Turbopack) + **React 19**
+- **SQLite** (better-sqlite3) — WAL mode
+- **ESLint 9** — flat config `eslint.config.mjs`
+- Node.js ≥ 20.9 (khuyến nghị 22)
 
 ## UI/UX
 

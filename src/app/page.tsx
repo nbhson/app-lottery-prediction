@@ -68,7 +68,9 @@ export default function HomePage() {
   };
 
   useEffect(() => {
-    fetchLatest("MEGA_645");
+    queueMicrotask(() => {
+      fetchLatest("MEGA_645");
+    });
   }, [fetchLatest]);
 
   return (
