@@ -1,6 +1,6 @@
 # Vietlott Prediction — Enterprise Edition
 
-[![CI](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/nguyenson/app-lottery-prediction/actions/workflows/ci)
+[![CI](https://github.com/nbhson/app-lottery-prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/nbhson/app-lottery-prediction/actions/workflows/ci)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 > Ứng dụng web chuẩn enterprise: **tự động đồng bộ kết quả Vietlott THẬT** từ website chính thức, dự đoán kết hợp **thống kê + model AI** (cấu hình qua `.env`), **tự chấm điểm độ chính xác dự đoán** (accuracy tracking) và **audit chất lượng dữ liệu** (data quality audit).
@@ -27,6 +27,9 @@
 - **Data Ingestion:** scraper tự động từ `vietlott.vn` (English version — đã xác minh hoạt động), chống trùng lặp bằng `UNIQUE(draw_number, lottery_type)`
 - **AI Module:** OpenAI-compatible API (OpenAI/OpenRouter/Groq/DeepSeek/custom), cấu hình 100% qua `.env`
 - **Fallback an toàn:** AI lỗi/timeout/thiếu key → tự động trả kết quả thống kê, hiển thị trạng thái minh bạch
+- **Accuracy Tracking:** mọi dự đoán được ghi `prediction_log`; kỳ mới sync xong → tự chấm điểm (số trúng) → thống kê avgMatches / baseline random / lift (trang `/prediction` + `GET /api/accuracy`)
+- **Data Quality Audit:** kiểm tra read-only (trùng lặp, bộ số sai, đứt chuỗi draw ID) → status OK/WARN/DEGRADED, hiển thị trong `GET /api/health`
+- **Health Check:** `GET /api/health` — DB liveness (503 khi chết) + quality audit + trạng thái sync/AI, sẵn sàng cắm monitoring/load balancer
 
 ## Tính năng
 
@@ -89,6 +92,10 @@ SYNC_API_TOKEN=<chuỗi ngẫu nhiên dài>
 Request phải kèm header `x-api-token: <token>` hoặc `Authorization: Bearer <token>`
 (so sánh timing-safe, tránh timing attack). Kiểm tra auth chạy **trước** rate-limit —
 kẻ lạ không thể đốt trần tổng. Chưa cấu hình token → sync mở (chỉ dùng cho dev).
+
+## Yêu cầu
+
+- **Node.js ≥ 20.9** (khuyến nghị **22 LTS** — requirement của Next.js 16)
 
 ## Cài đặt
 

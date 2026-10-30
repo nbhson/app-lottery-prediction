@@ -1,11 +1,13 @@
 # Plan — app-lottery-prediction
 
-> Kế hoạch nâng cấp chuẩn enterprise — cập nhật: 28/10/2026
+> Kế hoạch nâng cấp chuẩn enterprise — cập nhật: 30/10/2026
 
 ## Trạng thái hiện tại
 
-Ứng dụng web Next.js 14: tra cứu kết quả Vietlott (Mega 6/45, Power 6/55),
-dự đoán thống kê + AI (OpenAI-compatible), dữ liệu thật từ vietlott.vn.
+Ứng dụng web **Next.js 16 + React 19** (Turbopack, ESLint 9 flat config):
+tra cứu kết quả Vietlott (Mega 6/45, Power 6/55), dự đoán thống kê + AI
+(OpenAI-compatible), dữ liệu thật từ vietlott.vn, accuracy tracking tự chấm
+điểm dự đoán, data quality audit, health check, bảo vệ API sync bằng token.
 
 ## Đánh giá ban đầu (27/10/2026)
 
