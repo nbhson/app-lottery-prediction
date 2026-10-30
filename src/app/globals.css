@@ -542,6 +542,7 @@ a { color: var(--color-primary); }
   font-weight: 500;
   transition: all var(--transition-fast);
   white-space: nowrap;
+  text-decoration: none; /* dùng cho <a> (TypeSelectorLinks — SSR) */
 }
 
 .type-btn:hover {

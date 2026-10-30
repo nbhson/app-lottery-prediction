@@ -1,0 +1,12 @@
+node_modules
+.next
+data
+tests
+.github
+plan
+scripts
+*.md
+.DS_Store
+.env
+.env.*
+tsconfig.tsbuildinfo

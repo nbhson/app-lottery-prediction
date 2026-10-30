@@ -30,14 +30,29 @@
 - **Accuracy Tracking:** mọi dự đoán được ghi `prediction_log`; kỳ mới sync xong → tự chấm điểm (số trúng) → thống kê avgMatches / baseline random / lift (trang `/prediction` + `GET /api/accuracy`)
 - **Data Quality Audit:** kiểm tra read-only (trùng lặp, bộ số sai, đứt chuỗi draw ID) → status OK/WARN/DEGRADED, hiển thị trong `GET /api/health`
 - **Health Check:** `GET /api/health` — DB liveness (503 khi chết) + quality audit + trạng thái sync/AI, sẵn sàng cắm monitoring/load balancer
-- **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; trang chủ render server (SSR) — kết quả hiển thị ngay trong HTML đầu tiên
+- **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; trang chủ + lịch sử render server (SSR) — dữ liệu hiển thị ngay trong HTML đầu tiên
+
+## Deploy với Docker
+
+```bash
+docker build -t vietlott-prediction .
+docker run -d --name vietlott \
+  -p 3000:3000 \
+  -v vietlott-data:/app/data \      # SQLite bền vững qua các lần chạy
+  --env-file .env \                 # AI config + SYNC_API_TOKEN (tùy chọn)
+  vietlott-prediction
+```
+
+- Multi-stage build trên `node:22-slim`, chạy user không đặc quyền, volume `/app/data`
+- Build standalone chỉ bật khi `BUILD_STANDALONE=1` (Dockerfile tự set) — `npm start` cục bộ không bị ảnh hưởng
+- Lưu ý: app cần IP Việt Nam để truy cập vietlott.vn — deploy server tại VN hoặc gắn proxy
 
 ## Tính năng
 
 | Trang | Mô tả |
 |---|---|
 | `/` | Kết quả mới nhất (dữ liệu thật) + nút đồng bộ thủ công |
-| `/history` | Lịch sử kết quả, phân trang |
+| `/history` | Lịch sử kết quả — SSR + phân trang qua URL (chia sẻ được link `?type=&page=`) |
 | `/prediction` | Dự đoán thống kê (tần suất / gap / kết hợp) + **độ chính xác dự đoán** |
 | `/prediction/ai` | Dự đoán AI + thống kê kết hợp, có số yêu thích |
 | `/stats` | Thống kê nâng cao: tần suất đầy đủ, heatmap cặp số, xu hướng nóng/lạnh, tổng bộ số theo kỳ |
