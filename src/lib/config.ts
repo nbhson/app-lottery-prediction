@@ -32,6 +32,7 @@ const DEFAULT_AI_BASE_URLS: Record<string, string> = {
   openrouter: "https://openrouter.ai/api/v1",
   groq: "https://api.groq.com/openai/v1",
   deepseek: "https://api.deepseek.com/v1",
+  upstage: "https://api.upstage.ai/v1",
 };
 
 /** Các nguồn dữ liệu hợp lệ cho DATA_SOURCE */

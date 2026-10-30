@@ -25,7 +25,7 @@
 - **Auto-sync:** `src/instrumentation.ts` bật scheduler khi server start (Next.js instrumentation hook) — sync ngay lúc khởi động + theo chu kỳ `DATA_SYNC_INTERVAL_MINUTES`. Khóa chống chạy song song 2 lớp: flag trong process + bản ghi `sync_log RUNNING` (an toàn khi chạy nhiều instance)
 - **Backfill:** DB thiếu dữ liệu (< 120 kỳ) → tự động backfill: 1 request trang lịch sử (winning-number-645/655) + chuỗi request chi tiết từng kỳ qua ajaxpro (đã xác minh hoạt động) cho tới khi đủ dữ liệu cho thống kê/dự đoán
 - **Data Ingestion:** scraper tự động từ `vietlott.vn` (English version — đã xác minh hoạt động), chống trùng lặp bằng `UNIQUE(draw_number, lottery_type)`
-- **AI Module:** OpenAI-compatible API (OpenAI/OpenRouter/Groq/DeepSeek/custom), cấu hình 100% qua `.env`
+- **AI Module:** OpenAI-compatible API (OpenAI/OpenRouter/Groq/DeepSeek/Upstage/custom), cấu hình 100% qua `.env` — retry 429/5xx/timeout có backoff, parse JSON chịu được markdown fence, validate số trong phạm vi + supplement từ thống kê khi AI trả thiếu
 - **Fallback an toàn:** AI lỗi/timeout/thiếu key → tự động trả kết quả thống kê, hiển thị trạng thái minh bạch
 - **Accuracy Tracking:** mọi dự đoán được ghi `prediction_log`; kỳ mới sync xong → tự chấm điểm (số trúng) → thống kê avgMatches / baseline random / lift (trang `/prediction` + `GET /api/accuracy`)
 - **Data Quality Audit:** kiểm tra read-only (trùng lặp, bộ số sai, đứt chuỗi draw ID) → status OK/WARN/DEGRADED, hiển thị trong `GET /api/health`
@@ -150,6 +150,9 @@ FETCH_MAX_RETRIES=3
 npm test                                   # 66 unit + integration tests (tsx --test)
 npm run lint                               # ESLint 9 (flat config — Next 16 đã xóa `next lint`)
 npm run build                              # production build (Turbopack)
+
+# AI smoke test — gọi provider AI THẬT end-to-end (DB thật → AI → parse → validate):
+set -a; source .env; set +a; npx tsx scripts/ai-smoke.ts [MEGA_645|POWER_655]
 ```
 
 ## Stack

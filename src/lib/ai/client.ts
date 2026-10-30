@@ -101,9 +101,10 @@ export async function chatCompletion(
         signal: AbortSignal.timeout(config.ai.timeoutMs),
       });
 
-      // Lỗi HTTP tạm thời (429/5xx) → retry 1 lần
+      // Lỗi HTTP tạm thời (429/5xx) → retry 1 lần (có delay — lịch sự với provider)
       if (!response.ok) {
         if (isRetryableStatus(response.status) && attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
         return {
@@ -129,8 +130,9 @@ export async function chatCompletion(
 
       // Lỗi nghiệp vụ từ API (trả 200 nhưng body có error)
       if (payload.error) {
-        // 429-style từ body → thử retry 1 lần
+        // 429-style từ body → thử retry 1 lần (có delay)
         if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1000));
           continue;
         }
         return {
@@ -164,7 +166,10 @@ export async function chatCompletion(
         (error.name === "TimeoutError" || error.name === "AbortError");
 
       if (isTimeout) {
-        if (attempt < maxAttempts) continue;
+        if (attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
         return {
           success: false,
           error: "AI_TIMEOUT",

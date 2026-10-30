@@ -206,6 +206,22 @@ build     →  17 routes (Turbopack) — 1 warning vô hại về process.once t
              instrumentation.ts (đã guard NEXT_RUNTIME=nodejs, chỉ runtime Node chạy)
 ```
 
+## Cập nhật 30/10/2026 (vòng 8) — provider Upstage + AI smoke test
+
+- `config.ts`: thêm provider **upstage** vào DEFAULT_AI_BASE_URLS
+  (https://api.upstage.ai/v1) — .env chỉ cần `AI_PROVIDER=upstage`,
+  không cần set AI_BASE_URL
+- `scripts/ai-smoke.ts` (mới): smoke test gọi provider AI THẬT end-to-end
+  (config → DB thật → chatCompletion → parse JSON → validate số lượng/phạm vi).
+  Chạy: `set -a; source .env; set +a; npx tsx scripts/ai-smoke.ts [MEGA_645|POWER_655]`.
+  Exit 1 khi AI lỗi — dùng được cho ops check
+- `ai/client.ts`: thêm delay 1s trước retry 429/5xx/body-error (500ms cho
+  timeout) — trước đó retry ngay lập tức, thiếu lịch sự với provider
+- `.env.example` + README: danh sách provider bổ sung upstage + hướng dẫn smoke test
+- **Đã xác minh thực tế với Upstage solar-pro4**: MEGA_645 (2077ms) và
+  POWER_655 (1831ms) — AI trả JSON đúng format, 6 số trong phạm vi,
+  reasoning tiếng Việt, validate pass
+
 ## Trạng thái: ✅ BACKLOG ĐÃ XỬ LÝ HẾT — chuyển sang chế độ bảo trì
 
 ## Việc tiếp theo (backlog)
