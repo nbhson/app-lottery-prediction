@@ -43,7 +43,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       # Xác minh Dockerfile build được (không push) — image dùng cho deploy
       - name: Build Docker image
