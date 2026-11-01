@@ -19,6 +19,33 @@ export function formatDate(dateStr: string): string {
   });
 }
 
+/**
+ * Parse mốc thời gian DB (UTC naive "YYYY-MM-DD HH:MM:SS" hoặc ISO có Z)
+ * → Date theo UTC. DB lưu UTC chuẩn (datetime('now')) — KHÔNG được để JS
+ * parse chuỗi naive theo timezone của server.
+ */
+export function parseUtcTimestamp(dateStr: string): Date {
+  const normalized = dateStr.includes("T")
+    ? dateStr
+    : dateStr.replace(" ", "T") + "Z";
+  return new Date(normalized);
+}
+
+/**
+ * Format mốc thời gian DB (UTC "YYYY-MM-DD HH:MM:SS") thành ngày VN.
+ * Dùng cho created_at/last_sync/sync_log — khác draw_date (date-only, dùng
+ * formatDate). Parse UTC + pin Asia/Ho_Chi_Minh → hiển thị đúng giờ VN
+ * bất kể timezone của server/browser.
+ */
+export function formatDbDate(dateStr: string): string {
+  return parseUtcTimestamp(dateStr).toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "Asia/Ho_Chi_Minh",
+  });
+}
+
 /** Format tiền VNĐ (jackpot). 0 → "—" (chưa có dữ liệu). */
 export function formatVnd(v: number): string {
   if (v === 0) return "—";

@@ -10,7 +10,7 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { LOTTERY_RULES, LotteryType, DrawResult, DataSourceStatus } from "@/types/lottery";
 import LotteryBall from "@/components/LotteryBall";
-import { formatDate, formatVnd } from "@/lib/format";
+import { formatDate, formatDbDate, formatVnd } from "@/lib/format";
 
 interface HomeClientProps {
   initialData: DrawResult | null;
@@ -85,7 +85,7 @@ export default function HomeClient({ initialData, initialStatus }: HomeClientPro
           {status.note && <span> — {status.note}</span>}
           {status.lastSync && (
             <span style={{ marginLeft: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>
-              Lần đồng bộ: {formatDate(status.lastSync)}
+              Lần đồng bộ: {formatDbDate(status.lastSync)}
             </span>
           )}
           <span style={{ marginLeft: "var(--space-2)" }}>

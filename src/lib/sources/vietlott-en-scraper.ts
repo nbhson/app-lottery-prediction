@@ -347,6 +347,12 @@ const DETAIL_WEBPARTS: Record<LotteryType, { type: string; key: string }> = {
   POWER_655: { type: "Game655ResultDetailWebPart", key: "e0a60505" },
 };
 
+/** URL endpoint ajaxpro chi tiết (export cho log cảnh báo backfill) */
+export function getDetailEndpointUrl(lotteryType: LotteryType): string {
+  const wp = DETAIL_WEBPARTS[lotteryType];
+  return `https://vietlott.vn/ajaxpro/Vietlott.PlugIn.WebParts.${wp.type},Vietlott.PlugIn.WebParts.ashx`;
+}
+
 /** ORenderInfo đầy đủ (lấy từ endpoint WebEnvironments.ServerSideFrontEndCreateRenderInfo — đã xác minh) */
 const ORENDER_INFO = {
   SiteId: "main.frontend.vi",

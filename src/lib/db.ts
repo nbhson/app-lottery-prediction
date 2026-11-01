@@ -6,6 +6,12 @@
  * - data_source: trạng thái nguồn dữ liệu (bản ghi duy nhất id = 1)
  * - sync_log: lịch sử các lần đồng bộ dữ liệu
  *
+ * Múi giờ: TẤT CẢ mốc thời gian (created_at, started_at, finished_at,
+ * graded_at, last_sync) lưu UTC chuẩn (datetime('now')). Chỉ format sang
+ * UTC+7 (Asia/Ho_Chi_Minh) ở lớp hiển thị — xem parseUtcTimestamp/formatDate
+ * trong src/lib/format.ts. So sánh mốc trong SQL cũng dùng datetime('now')
+ * nên luôn nhất quán UTC.
+ *
  * KHÔNG seed dữ liệu mẫu — dữ liệu chỉ đến từ nguồn sync thực tế.
  */
 import Database from "better-sqlite3";
@@ -86,7 +92,7 @@ const DRAWS_TABLE_SQL = `
     bonus_number INTEGER,
     jackpot INTEGER DEFAULT 0,
     published INTEGER DEFAULT 1,
-    created_at TEXT DEFAULT (datetime('now', '+7 hours')),
+    created_at TEXT DEFAULT (datetime('now')),
     UNIQUE(draw_number, lottery_type)
   )
 `;
@@ -106,7 +112,7 @@ function initSchema(): void {
       bonus_number INTEGER,
       jackpot INTEGER DEFAULT 0,
       published INTEGER DEFAULT 1,
-      created_at TEXT DEFAULT (datetime('now', '+7 hours')),
+      created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(draw_number, lottery_type)
     );
 
@@ -122,7 +128,7 @@ function initSchema(): void {
     CREATE TABLE IF NOT EXISTS sync_log (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       source TEXT NOT NULL,
-      started_at TEXT NOT NULL DEFAULT (datetime('now', '+7 hours')),
+      started_at TEXT NOT NULL DEFAULT (datetime('now')),
       finished_at TEXT,
       status TEXT NOT NULL DEFAULT 'RUNNING'
         CHECK(status IN ('RUNNING', 'SUCCESS', 'FAILED')),
@@ -138,7 +144,7 @@ function initSchema(): void {
       confidence INTEGER,
       after_draw_number TEXT NOT NULL,
       after_draw_date TEXT NOT NULL,
-      created_at TEXT DEFAULT (datetime('now', '+7 hours')),
+      created_at TEXT DEFAULT (datetime('now')),
       graded_draw_number TEXT,
       graded_draw_date TEXT,
       matches INTEGER,
@@ -453,11 +459,11 @@ export function setSyncStatus(params: SyncStatusParams): void {
     .prepare(
       `
       INSERT INTO data_source (id, connected, source, last_sync, record_count, note)
-      VALUES (1, @connected, @source, datetime('now', '+7 hours'), @recordCount, @note)
+      VALUES (1, @connected, @source, datetime('now'), @recordCount, @note)
       ON CONFLICT(id) DO UPDATE SET
         connected = @connected,
         source = @source,
-        last_sync = datetime('now', '+7 hours'),
+        last_sync = datetime('now'),
         record_count = @recordCount,
         note = @note
     `
@@ -516,7 +522,7 @@ export function finishSyncLog(params: FinishSyncParams): void {
     .prepare(
       `
       UPDATE sync_log
-      SET finished_at = datetime('now', '+7 hours'),
+      SET finished_at = datetime('now'),
           status = @status,
           records_added = @recordsAdded,
           error_message = @errorMessage
@@ -662,7 +668,7 @@ export function gradePredictionLog(params: GradePredictionParams): void {
         graded_draw_date = @gradedDrawDate,
         matches = @matches,
         matched_numbers = @matchedNumbers,
-        graded_at = datetime('now', '+7 hours')
+        graded_at = datetime('now')
     WHERE id = @id
   `
     )

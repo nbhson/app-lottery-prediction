@@ -17,6 +17,7 @@ import {
   scrapeLatest,
   scrapeHistory,
   scrapeDrawDetail,
+  getDetailEndpointUrl,
 } from "@/lib/sources/vietlott-en-scraper";
 import {
   upsertDraw,
@@ -246,17 +247,32 @@ export async function backfillHistory(
     inserted += insertDrawsMany(history.draws);
 
     // Bước 2: chain ajaxpro — scrape lần lượt kỳ trước đó từ kỳ cũ nhất trong DB
-    let nextId = getOldestDraw(lotteryType)?.drawNumber.match(/-(\d+)$/)?.[1];
+    const oldest = getOldestDraw(lotteryType);
+    let nextId = oldest?.drawNumber.match(/-(\d+)$/)?.[1];
+    if (!nextId) {
+      // Không parse được nextId từ draw_number → dừng chain, nhưng PHẢI noisy
+      console.warn(
+        `[backfill] ${lotteryType}: không parse được nextId từ draw_number` +
+          `${oldest ? ` "${oldest.drawNumber}"` : " (DB không có kỳ nào)"} — ` +
+          `dừng chain ajaxpro sau ${inserted} kỳ đã chèn. ` +
+          `Endpoint chi tiết: ${getDetailEndpointUrl(lotteryType)}`
+      );
+    }
     let misses = 0;
     while (
       countDraws(lotteryType) < BACKFILL_TARGET &&
       misses < BACKFILL_MAX_MISSES
     ) {
-      if (!nextId) break; // hết lịch sử hoặc không xác định được kỳ trước
+      if (!nextId) break; // đã warn ở trên — giữ hành vi dừng, không loop vô hạn
 
       const detail = await scrapeDrawDetail(lotteryType, nextId);
       if (!detail.success || !detail.data) {
         misses++;
+        console.warn(
+          `[backfill] ${lotteryType}: scrape kỳ ${nextId} thất bại ` +
+            `(${misses}/${BACKFILL_MAX_MISSES} lỗi liên tiếp): ` +
+            `${detail.error ?? "Unknown error"}`
+        );
         continue;
       }
       misses = 0; // thành công — reset bộ đếm lỗi liên tiếp
@@ -267,6 +283,15 @@ export async function backfillHistory(
       if (!detail.previousDrawId) break; // đã về kỳ đầu tiên trong lịch sử
       nextId = detail.previousDrawId;
       await new Promise((r) => setTimeout(r, BACKFILL_REQUEST_DELAY_MS));
+    }
+
+    // Dừng chain trước khi đủ target → cảnh báo rõ (chain dừng nhưng phải noisy)
+    if (countDraws(lotteryType) < BACKFILL_TARGET && misses > 0) {
+      console.warn(
+        `[backfill] ${lotteryType}: dừng chain sau ${BACKFILL_MAX_MISSES} lỗi ` +
+          `liên tiếp — DB còn ${BACKFILL_TARGET - countDraws(lotteryType)} kỳ ` +
+          `thiếu so với target ${BACKFILL_TARGET}. Kỳ dừng: ${nextId ?? "n/a"}`
+      );
     }
 
     if (inserted > 0) {
