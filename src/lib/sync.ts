@@ -33,6 +33,7 @@ import {
   updateJackpotIfMissing,
 } from "@/lib/db";
 import { gradePredictionsForNewDraw } from "@/lib/accuracy";
+import { recordSyncFailure, recordSyncSuccess } from "@/lib/notify";
 import { LotteryType } from "@/types/lottery";
 
 /** Kết quả một lần sync */
@@ -58,6 +59,28 @@ export interface SyncAllResult {
 }
 
 const ALL_TYPES: readonly LotteryType[] = ["MEGA_645", "POWER_655"];
+
+/**
+ * finishSyncLog + notify (15.5): FAIL → đếm lỗi liên tiếp (đủ 3 lần liên tiếp
+ * → cảnh báo webhook, xem src/lib/notify.ts), SUCCESS → reset bộ đếm.
+ * `key` phân biệt luồng: "sync:<TYPE>" / "backfill:<TYPE>".
+ */
+function finishSyncWithNotify(
+  logHandle: { id: number },
+  key: string,
+  params: {
+    status: "SUCCESS" | "FAILED";
+    recordsAdded: number;
+    errorMessage?: string | null;
+  }
+): void {
+  finishSyncLog({ logId: logHandle.id, ...params });
+  if (params.status === "FAILED") {
+    recordSyncFailure(key, params.errorMessage ?? "Unknown error");
+  } else {
+    recordSyncSuccess(key);
+  }
+}
 
 /** Số kỳ tối thiểu trong DB trước khi coi là "đủ dữ liệu" cho thống kê/dự đoán */
 export const BACKFILL_TARGET = 120;
@@ -93,8 +116,7 @@ export async function syncLotteryType(
 
     if (!result.success || !result.data) {
       const error = result.error ?? "Unknown scrape error";
-      finishSyncLog({
-        logId: logHandle.id,
+      finishSyncWithNotify(logHandle, `sync:${lotteryType}`, {
         status: "FAILED",
         recordsAdded: 0,
         errorMessage: error,
@@ -127,8 +149,7 @@ export async function syncLotteryType(
         source: "vietlott.vn (EN)",
         note: "Đồng bộ tự động — dữ liệu đã cập nhật",
       });
-      finishSyncLog({
-        logId: logHandle.id,
+      finishSyncWithNotify(logHandle, `sync:${lotteryType}`, {
         status: "SUCCESS",
         recordsAdded: 0,
       });
@@ -170,8 +191,7 @@ export async function syncLotteryType(
       note: "Đồng bộ tự động từ website chính thức Vietlott",
     });
 
-    finishSyncLog({
-      logId: logHandle.id,
+    finishSyncWithNotify(logHandle, `sync:${lotteryType}`, {
       status: "SUCCESS",
       recordsAdded: inserted ? 1 : 0,
     });
@@ -193,8 +213,7 @@ export async function syncLotteryType(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown sync error";
-    finishSyncLog({
-      logId: logHandle.id,
+    finishSyncWithNotify(logHandle, `sync:${lotteryType}`, {
       status: "FAILED",
       recordsAdded: 0,
       errorMessage: message,
@@ -236,8 +255,7 @@ export async function backfillHistory(
     // Bước 1: trang lịch sử (8 kỳ gần nhất)
     const history = await scrapeHistory(lotteryType);
     if (!history.success || !history.draws) {
-      finishSyncLog({
-        logId: logHandle.id,
+      finishSyncWithNotify(logHandle, `backfill:${lotteryType}`, {
         status: "FAILED",
         recordsAdded: 0,
         errorMessage: history.error ?? "Unknown history scrape error",
@@ -302,8 +320,7 @@ export async function backfillHistory(
       });
     }
 
-    finishSyncLog({
-      logId: logHandle.id,
+    finishSyncWithNotify(logHandle, `backfill:${lotteryType}`, {
       status: "SUCCESS",
       recordsAdded: inserted,
     });
@@ -311,8 +328,7 @@ export async function backfillHistory(
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unknown backfill error";
-    finishSyncLog({
-      logId: logHandle.id,
+    finishSyncWithNotify(logHandle, `backfill:${lotteryType}`, {
       status: "FAILED",
       recordsAdded: 0,
       errorMessage: message,

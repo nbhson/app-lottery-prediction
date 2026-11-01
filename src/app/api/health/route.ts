@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { getDb, countDraws, getSyncStatus } from "@/lib/db";
 import { auditDataQuality } from "@/lib/data-quality";
 import { getConfig } from "@/lib/config";
+import { notifySyncStale } from "@/lib/notify";
 import { parseUtcTimestamp } from "@/lib/format";
 import { LotteryType } from "@/types/lottery";
 
@@ -99,6 +100,13 @@ export async function GET() {
             `${Math.round(staleThresholdMs / 60_000)} phút. ` +
             "Kiểm tra scheduler sync / nguồn vietlott.vn."
         );
+        // 15.5: cảnh báo qua webhook (nếu NOTIFY_WEBHOOK_URL được cấu hình) —
+        // fire-and-forget, cooldown 1 giờ/reason trong notify.ts chống spam.
+        void notifySyncStale(
+          syncStatus.lastSync,
+          syncAgeMinutes,
+          Math.round(staleThresholdMs / 60_000)
+        ).catch(() => {});
       }
     }
   }

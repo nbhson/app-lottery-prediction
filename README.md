@@ -32,6 +32,7 @@
 - **Health Check:** `GET /api/health` — DB liveness (503 khi chết) + quality audit + trạng thái sync/AI, sẵn sàng cắm monitoring/load balancer
 - **Hiệu năng:** cache TTL 60s cho thống kê nặng (tần suất/cặp số/tổng bộ số), tự vô hiệu hóa khi sync chèn kỳ mới; các trang dữ liệu (trang chủ, lịch sử, thống kê, dự đoán) render server (SSR) — dữ liệu hiển thị ngay trong HTML đầu tiên
 - **Rate limit 2 chế độ:** in-memory (mặc định, single instance) hoặc **Redis** khi set `REDIS_URL` — chia sẻ bucket qua nhiều instance, Lua script atomic, tự fallback in-memory khi Redis lỗi
+- **Cảnh báo webhook:** sync/backfill fail liên tiếp (≥ 3 lần) hoặc dữ liệu stale quá ngưỡng → POST qua `NOTIFY_WEBHOOK_URL` (generic JSON hoặc Telegram sendMessage), cooldown 1 giờ chống spam — không cấu hình → no-op
 
 ## Deploy với Docker
 
@@ -120,7 +121,7 @@ kẻ lạ không thể đốt trần tổng. Chưa cấu hình token → sync m�
 npm install
 cp .env.example .env   # cấu hình AI (tùy chọn) + data source + SYNC_API_TOKEN (khuyến nghị)
 npm run dev            # → http://localhost:3000 (auto-sync + backfill tự chạy lúc start)
-npm test               # 77 unit + integration tests (chạy qua tsx)
+npm test               # 96 unit + integration tests (chạy qua tsx)
 ```
 
 ### Cấu hình `.env`
@@ -142,6 +143,11 @@ FETCH_MAX_RETRIES=3
 # TRUST_PROXY=1               # bật khi chạy sau reverse proxy đáng tin (nginx/Vercel)
 # SYNC_API_TOKEN=<token>      # bảo vệ POST /api/sync khi deploy public
 # REDIS_URL=redis://host:6379 # rate-limit multi-instance (bỏ trống → in-memory)
+
+# Cảnh báo sync (15.5 — tùy chọn, bỏ trống → no-op)
+# NOTIFY_WEBHOOK_URL=https://hooks.example.com/alert
+#   hoặc Telegram: https://api.telegram.org/bot<TOKEN>/sendMessage?chat_id=<ID>
+# NOTIFY_TELEGRAM_CHAT_ID=<chat_id>  # khi không nhúng chat_id vào URL
 ```
 
 **Lưu ý:** Vietlott chặn IP ngoài Việt Nam — nếu chạy từ nước ngoài cần đặt server tại VN hoặc dùng proxy. Nguồn dữ liệu chính thức: `https://vietlott.vn/en/trung-thuong/ket-qua-trung-thuong/645` (đã xác minh trả dữ liệu thật). Lần chạy đầu app tự backfill ~120 kỳ/loại hình (~2-3 phút, chạy nền).
@@ -168,7 +174,7 @@ FETCH_MAX_RETRIES=3
 ## Kiểm thử
 
 ```bash
-npm test                                   # 77 unit + integration tests (tsx --test)
+npm test                                   # 96 unit + integration tests (tsx --test)
 npm run lint                               # ESLint 9 (flat config — Next 16 đã xóa `next lint`)
 npm run build                              # production build (Turbopack)
 

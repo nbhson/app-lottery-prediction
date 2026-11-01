@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts tests/accuracy.test.ts tests/api-routes.test.ts tests/cache.test.ts tests/sum-stats.test.ts tests/jackpot.test.ts",
+    "test": "tsx --test tests/prediction.test.ts tests/rate-limit.test.ts tests/format.test.ts tests/accuracy.test.ts tests/api-routes.test.ts tests/cache.test.ts tests/sum-stats.test.ts tests/jackpot.test.ts tests/notify.test.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
